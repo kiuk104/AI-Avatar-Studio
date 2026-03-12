@@ -32,9 +32,6 @@ import {
   Check
 } from 'lucide-react';
 import { generateAvatar } from './services/geminiService';
-import { HAIR_GROUPS, ALL_HAIR_STYLES, HAIR_THUMBNAIL_URL } from './components/thumbnails';
-import type { HairGroup } from './components/thumbnails';
-import { ColorSwatch } from './components/ColorSwatch';
 
 const STYLES = [
   { id: '3d-render', name: '3D Render', description: 'Modern Pixar-style 3D character', prompt: '3D Pixar style, high detail, soft lighting' },
@@ -46,144 +43,151 @@ const STYLES = [
   { id: 'anime', name: 'Anime', description: 'Classic Japanese animation style', prompt: 'modern anime style, vibrant colors' },
 ];
 
-const thumbUrl = (cat: string, opt: string) =>
-  `/thumbnails/${cat}-${opt.toLowerCase().replace(/\s+/g, '-')}.png`;
-
-const HAIR_COLORS = {
-  natural: { label: '자연 컬러', colors: { 'Black': '#1A1A1A', 'Dark Brown': '#3B2314', 'Brown': '#6B4226', 'Auburn': '#8B3A1A', 'Blonde': '#D4A84B', 'Platinum': '#E8E0D0', 'Gray': '#9E9E9E', 'White': '#F5F5F5' } },
-  special: { label: '특수 컬러', colors: { 'Red': '#E53935', 'Pink': '#EC407A', 'Purple': '#8E24AA', 'Blue': '#1E88E5', 'Green': '#43A047' } },
-};
-
-const OUTFIT_COLORS: Record<string, string> = {
-  'Black': '#1A1A1A', 'White': '#F5F5F5', 'Navy': '#1A237E', 'Red': '#D32F2F',
-  'Gray': '#616161', 'Beige': '#D7CCC8', 'Green': '#2E7D32', 'Blue': '#1565C0',
-  'Pink': '#E91E63', 'Brown': '#5D4037',
-};
-
 const BUILDER_OPTIONS = {
-  gender: {
-    name: '성별',
-    icon: User,
-    options: ['Male', 'Female', 'Non-binary'],
-    thumbnails: Object.fromEntries(['Male', 'Female', 'Non-binary'].map(s => [s, thumbUrl('gender', s)])),
-  },
   skin: {
     name: '피부',
     icon: Smile,
     options: ['Fair', 'Light', 'Medium', 'Tan', 'Deep', 'Golden', 'Olive'],
     colors: {
-      'Fair': '#F9E4D4', 'Light': '#F3D0B5', 'Medium': '#E6B99C',
-      'Tan': '#C68E65', 'Deep': '#8D5524', 'Golden': '#E1AD72', 'Olive': '#AD8C6D',
-    },
+      'Fair': '#F9E4D4',
+      'Light': '#F3D0B5',
+      'Medium': '#E6B99C',
+      'Tan': '#C68E65',
+      'Deep': '#8D5524',
+      'Golden': '#E1AD72',
+      'Olive': '#AD8C6D'
+    }
   },
   hair: {
     name: '헤어스타일',
     icon: Scissors,
-    options: ALL_HAIR_STYLES,
-    thumbnails: Object.fromEntries(ALL_HAIR_STYLES.map(s => [s, HAIR_THUMBNAIL_URL(s)])),
-    groups: HAIR_GROUPS,
+    options: ['Bald', 'Buzz Cut', 'Short Wavy', 'Side Part', 'Top Knot', 'Long Straight', 'Curly Afro', 'Bob Cut', 'Ponytail', 'Braids'],
+    thumbnails: {
+      'Bald': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468_200d_1f9b2/512.webp',
+      'Buzz Cut': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468/512.webp',
+      'Short Wavy': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468_200d_1f9b0/512.webp',
+      'Side Part': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d1_200d_1f9b0/512.webp',
+      'Top Knot': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f471_200d_2642_fe0f/512.webp',
+      'Long Straight': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f469_200d_1f9b0/512.webp',
+      'Curly Afro': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d1_200d_1f9b1/512.webp',
+      'Bob Cut': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f469/512.webp',
+      'Ponytail': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f471_200d_2640_fe0f/512.webp',
+      'Braids': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f467/512.webp'
+    }
   },
   eyebrows: {
     name: '눈썹',
     icon: Wind,
     options: ['Natural', 'Thin', 'Thick', 'Arched', 'Straight', 'Bushy'],
-    thumbnails: Object.fromEntries(['Natural', 'Thin', 'Thick', 'Arched', 'Straight', 'Bushy'].map(s => [s, thumbUrl('eyebrows', s)])),
+    thumbnails: {
+      'Natural': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f928/512.webp',
+      'Thin': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.webp',
+      'Thick': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f611/512.webp',
+      'Arched': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d0/512.webp',
+      'Straight': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f614/512.webp',
+      'Bushy': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f644/512.webp'
+    }
   },
   eyes: {
     name: '눈',
     icon: Eye,
     options: ['Round', 'Almond', 'Hooded', 'Monolid', 'Droopy', 'Wide'],
-    colors: { 'Brown': '#3E2723', 'Blue': '#0277BD', 'Green': '#2E7D32', 'Grey': '#546E7A', 'Hazel': '#795548', 'Amber': '#FFB300' },
+    colors: { 'Brown': '#3E2723', 'Blue': '#0277BD', 'Green': '#2E7D32', 'Grey': '#546E7A', 'Hazel': '#795548', 'Amber': '#FFB300' }
   },
   face: {
     name: '얼굴',
     icon: UserIcon,
     options: ['Oval', 'Round', 'Square', 'Heart', 'Diamond', 'Long'],
-    thumbnails: Object.fromEntries(['Oval', 'Round', 'Square', 'Heart', 'Diamond', 'Long'].map(s => [s, thumbUrl('face', s)])),
+    thumbnails: {
+      'Oval': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f636/512.webp',
+      'Round': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f642/512.webp',
+      'Square': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.webp',
+      'Heart': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f970/512.webp',
+      'Diamond': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f607/512.webp',
+      'Long': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f62e/512.webp'
+    }
   },
   nose: {
     name: '코',
     icon: Cloud,
     options: ['Small', 'Pointy', 'Wide', 'Button', 'Hooked', 'Flat'],
-    thumbnails: Object.fromEntries(['Small', 'Pointy', 'Wide', 'Button', 'Hooked', 'Flat'].map(s => [s, thumbUrl('nose', s)])),
+    thumbnails: {
+      'Small': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Pointy': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Wide': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Button': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Hooked': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Flat': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp'
+    }
   },
   lips: {
     name: '입',
     icon: Smile,
     options: ['Natural', 'Thin', 'Full', 'Wide', 'Small', 'Pouty'],
-    thumbnails: Object.fromEntries(['Natural', 'Thin', 'Full', 'Wide', 'Small', 'Pouty'].map(s => [s, thumbUrl('lips', s)])),
+    thumbnails: {
+      'Natural': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Thin': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Full': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Wide': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Small': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Pouty': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp'
+    }
   },
   facialHair: {
     name: '수염',
     icon: MoreHorizontal,
     options: ['None', 'Stubble', 'Goatee', 'Full Beard', 'Mustache', 'Circle Beard'],
-    thumbnails: Object.fromEntries(['None', 'Stubble', 'Goatee', 'Full Beard', 'Mustache', 'Circle Beard'].map(s => [s, thumbUrl('facialHair', s)])),
-    genderFilter: Object.fromEntries(['Stubble', 'Goatee', 'Full Beard', 'Mustache', 'Circle Beard'].map(s => [s, ['Male', 'Non-binary']])) as Record<string, string[]>,
+    thumbnails: {
+      'None': 'https://fonts.gstatic.com/s/e/notoemoji/latest/274c/512.webp',
+      'Stubble': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp',
+      'Goatee': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp',
+      'Full Beard': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp',
+      'Mustache': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468_200d_1f9b3/512.webp',
+      'Circle Beard': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp'
+    }
   },
   glasses: {
     name: '안경',
     icon: Glasses,
     options: ['None', 'Rectangular', 'Round', 'Aviator', 'Cat Eye', 'Wayfarer'],
-    thumbnails: Object.fromEntries(['None', 'Rectangular', 'Round', 'Aviator', 'Cat Eye', 'Wayfarer'].map(s => [s, thumbUrl('glasses', s)])),
-  },
-  earrings: {
-    name: '귀걸이',
-    icon: Circle,
-    options: ['None', 'Stud', 'Hoop', 'Drop'],
-    thumbnails: Object.fromEntries(['None', 'Stud', 'Hoop', 'Drop'].map(s => [s, thumbUrl('earrings', s)])),
-  },
-  necklace: {
-    name: '목걸이',
-    icon: Circle,
-    options: ['None', 'Chain', 'Pendant', 'Choker'],
-    thumbnails: Object.fromEntries(['None', 'Chain', 'Pendant', 'Choker'].map(s => [s, thumbUrl('necklace', s)])),
+    thumbnails: {
+      'None': 'https://fonts.gstatic.com/s/e/notoemoji/latest/274c/512.webp',
+      'Rectangular': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f453/512.webp',
+      'Round': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f453/512.webp',
+      'Aviator': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f576/512.webp',
+      'Cat Eye': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f453/512.webp',
+      'Wayfarer': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f576/512.webp'
+    }
   },
   headwear: {
     name: '헤드웨어',
     icon: Circle,
     options: ['None', 'Beanie', 'Baseball Cap', 'Beret', 'Fedora', 'Headband', 'Turban'],
-    thumbnails: Object.fromEntries(['None', 'Beanie', 'Baseball Cap', 'Beret', 'Fedora', 'Headband', 'Turban'].map(s => [s, thumbUrl('headwear', s)])),
+    thumbnails: {
+      'None': 'https://fonts.gstatic.com/s/e/notoemoji/latest/274c/512.webp',
+      'Beanie': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e2/512.webp',
+      'Baseball Cap': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e2/512.webp',
+      'Beret': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3a8/512.webp',
+      'Fedora': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3a9/512.webp',
+      'Headband': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f380/512.webp',
+      'Turban': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f473/512.webp'
+    }
   },
   outfit: {
     name: '옷',
     icon: Shirt,
-    options: ['T-Shirt', 'Hoodie', 'Suit', 'Dress', 'Sweater', 'Jacket', 'Tank Top', 'Turtleneck', 'Polo Shirt'],
-    thumbnails: Object.fromEntries(['T-Shirt', 'Hoodie', 'Suit', 'Dress', 'Sweater', 'Jacket', 'Tank Top', 'Turtleneck', 'Polo Shirt'].map(s => [s, thumbUrl('outfit', s)])),
-    genderFilter: { 'Dress': ['Female', 'Non-binary'] } as Record<string, string[]>,
+    options: ['T-Shirt', 'Hoodie', 'Suit', 'Dress', 'Sweater', 'Jacket', 'Tank Top'],
+    thumbnails: {
+      'T-Shirt': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f455/512.webp',
+      'Hoodie': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e5/512.webp',
+      'Suit': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4bc/512.webp',
+      'Dress': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f457/512.webp',
+      'Sweater': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e5/512.webp',
+      'Jacket': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e5/512.webp',
+      'Tank Top': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fbd/512.webp'
+    }
   },
 };
-
-// --- Saved Avatar Types ---
-type BuilderSettings = {
-  gender: string; skin: string; hair: string; hairColor: string;
-  eyebrows: string; eyes: string; face: string; nose: string;
-  lips: string; facialHair: string; glasses: string; earrings: string;
-  necklace: string; headwear: string; outfit: string; outfitColor: string;
-};
-
-type SavedAvatar = {
-  id: string;
-  createdAt: number;
-  imageUrl: string;
-  settings: BuilderSettings;
-  styleId: string;
-  mode: 'text' | 'builder';
-  prompt?: string;
-};
-
-const STORAGE_KEY = 'avatar-studio-saved';
-const MAX_SAVED = 20;
-
-function loadSaved(): SavedAvatar[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function persistSaved(items: SavedAvatar[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_SAVED)));
-}
 
 export default function App() {
   const [mode, setMode] = useState<'text' | 'builder'>('text');
@@ -191,18 +195,15 @@ export default function App() {
   const [selectedStyle, setSelectedStyle] = useState(STYLES[0]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
-  const [savedAvatars, setSavedAvatars] = useState<SavedAvatar[]>(loadSaved);
+  const [history, setHistory] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
   const [autoGenEnabled, setAutoGenEnabled] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
 
   // Builder State
-  const defaultBuilderState: BuilderSettings = {
-    gender: 'Male',
+  const [builderState, setBuilderState] = useState({
     skin: 'Medium',
     hair: 'Short Wavy',
-    hairColor: 'Black',
     eyebrows: 'Natural',
     eyes: 'Round',
     face: 'Oval',
@@ -210,27 +211,12 @@ export default function App() {
     lips: 'Natural',
     facialHair: 'None',
     glasses: 'None',
-    earrings: 'None',
-    necklace: 'None',
     headwear: 'None',
     outfit: 'T-Shirt',
-    outfitColor: 'Black',
-  };
-  const [builderState, setBuilderState] = useState<BuilderSettings>(defaultBuilderState);
-  const [activeCategory, setActiveCategory] = useState<keyof typeof BUILDER_OPTIONS>('gender');
-  const [activeHairGroup, setActiveHairGroup] = useState<HairGroup>('short');
+  });
+  const [activeCategory, setActiveCategory] = useState<keyof typeof BUILDER_OPTIONS>('skin');
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-  const toastTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2500);
-  }, []);
-
-  // Derived: history images for backward compat
-  const history = savedAvatars.map(a => a.imageUrl);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -252,24 +238,7 @@ export default function App() {
     let stylePrompt = selectedStyle.prompt;
     
     if (mode === 'builder') {
-      const parts: string[] = [
-        `A 3D Memoji ${builderState.gender.toLowerCase()} character`,
-        `with ${builderState.skin} skin`,
-        `${builderState.hairColor} colored ${builderState.hair} hair`,
-        `${builderState.eyebrows} eyebrows`,
-        `${builderState.eyes} eyes`,
-        `${builderState.face} face shape`,
-        `${builderState.nose} nose`,
-        `${builderState.lips} lips`,
-      ];
-      if (builderState.facialHair !== 'None') parts.push(`${builderState.facialHair} facial hair`);
-      if (builderState.glasses !== 'None') parts.push(`wearing ${builderState.glasses} glasses`);
-      if (builderState.earrings !== 'None') parts.push(`wearing ${builderState.earrings} earrings`);
-      if (builderState.necklace !== 'None') parts.push(`wearing a ${builderState.necklace} necklace`);
-      if (builderState.headwear !== 'None') parts.push(`wearing a ${builderState.headwear}`);
-      parts.push(`wearing a ${builderState.outfitColor} ${builderState.outfit}`);
-      parts.push('Front view, clean background.');
-      finalPrompt = parts.join(', ');
+      finalPrompt = `A 3D Memoji character with ${builderState.skin} skin, ${builderState.hair} hair, ${builderState.eyebrows} eyebrows, ${builderState.eyes} eyes, ${builderState.face} face shape, ${builderState.nose} nose, ${builderState.lips} lips, ${builderState.facialHair !== 'None' ? `${builderState.facialHair} facial hair, ` : ''}${builderState.glasses !== 'None' ? `wearing ${builderState.glasses} glasses, ` : ''}${builderState.headwear !== 'None' ? `wearing a ${builderState.headwear}, ` : ''}wearing a ${builderState.outfit}. Front view, clean background.`;
       stylePrompt = 'iPhone Memoji style, 3D emoji aesthetic, clean 3D render, Apple aesthetic, high quality, studio lighting';
     } else {
       // For text mode, default to front view if no camera-related keywords are present
@@ -288,22 +257,10 @@ export default function App() {
     try {
       const imageUrl = await generateAvatar(finalPrompt, stylePrompt, referenceImage || undefined);
       setCurrentAvatar(imageUrl);
-
-      const saved: SavedAvatar = {
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        imageUrl,
-        settings: { ...builderState },
-        styleId: selectedStyle.id,
-        mode,
-        prompt: mode === 'text' ? prompt : undefined,
-      };
-      setSavedAvatars(prev => {
-        const next = [saved, ...prev].slice(0, MAX_SAVED);
-        persistSaved(next);
-        return next;
+      setHistory(prev => {
+        if (prev.includes(imageUrl)) return prev;
+        return [imageUrl, ...prev].slice(0, 10);
       });
-      if (!isAuto) showToast('Avatar saved!');
     } catch (err) {
       if (!isAuto) {
         setError('Failed to generate avatar. Please try again.');
@@ -312,30 +269,7 @@ export default function App() {
     } finally {
       setIsGenerating(false);
     }
-  }, [mode, prompt, selectedStyle, builderState, referenceImage, showToast]);
-
-  const loadAvatar = useCallback((avatar: SavedAvatar) => {
-    setCurrentAvatar(avatar.imageUrl);
-    setBuilderState(avatar.settings);
-    const style = STYLES.find(s => s.id === avatar.styleId);
-    if (style) setSelectedStyle(style);
-    if (avatar.mode === 'text' && avatar.prompt) {
-      setMode('text');
-      setPrompt(avatar.prompt);
-    } else {
-      setMode('builder');
-    }
-    showToast('Settings restored!');
-  }, [showToast]);
-
-  const deleteAvatar = useCallback((id: string) => {
-    setSavedAvatars(prev => {
-      const next = prev.filter(a => a.id !== id);
-      persistSaved(next);
-      return next;
-    });
-    showToast('Avatar deleted');
-  }, [showToast]);
+  }, [mode, prompt, selectedStyle, builderState, referenceImage]);
 
   // Auto-generation effect for Builder Mode
   useEffect(() => {
@@ -385,7 +319,7 @@ export default function App() {
           <div className="flex items-center gap-4 text-sm text-zinc-500">
             <div className="flex items-center gap-2">
               <History className="w-4 h-4" />
-              <span>{savedAvatars.length} Created</span>
+              <span>{history.length} Created</span>
             </div>
           </div>
         </header>
@@ -522,131 +456,72 @@ export default function App() {
                       {'colors' in BUILDER_OPTIONS[activeCategory] && (
                         <div className="space-y-4">
                           <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Color Palette</h3>
-                          <ColorSwatch
-                            colors={(BUILDER_OPTIONS[activeCategory] as any).colors}
-                            selected={builderState[activeCategory]}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, [activeCategory]: name }))}
-                          />
-                        </div>
-                      )}
-
-                      {/* Hair color swatches */}
-                      {activeCategory === 'hair' && (
-                        <div className="space-y-3">
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hair Color</h3>
-                          <ColorSwatch
-                            colors={HAIR_COLORS.natural.colors}
-                            selected={builderState.hairColor}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, hairColor: name }))}
-                            label={HAIR_COLORS.natural.label}
-                            size="sm"
-                          />
-                          <ColorSwatch
-                            colors={HAIR_COLORS.special.colors}
-                            selected={builderState.hairColor}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, hairColor: name }))}
-                            label={HAIR_COLORS.special.label}
-                            size="sm"
-                          />
-                        </div>
-                      )}
-
-                      {/* Outfit color swatches */}
-                      {activeCategory === 'outfit' && (
-                        <div className="space-y-3">
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Outfit Color</h3>
-                          <ColorSwatch
-                            colors={OUTFIT_COLORS}
-                            selected={builderState.outfitColor}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, outfitColor: name }))}
-                            size="sm"
-                          />
+                          <div className="flex flex-wrap gap-3">
+                            {Object.entries((BUILDER_OPTIONS[activeCategory] as any).colors).map(([name, color]) => (
+                              <button
+                                key={name}
+                                onClick={() => setBuilderState(prev => ({ ...prev, [activeCategory]: name }))}
+                                className={`w-10 h-10 rounded-full border-2 transition-all hover:scale-110 ${
+                                  builderState[activeCategory] === name 
+                                    ? 'border-emerald-500 scale-110 shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                                    : 'border-transparent'
+                                }`}
+                                style={{ backgroundColor: color as string }}
+                                title={name}
+                              />
+                            ))}
+                          </div>
                         </div>
                       )}
 
                       {/* Visual Options Grid */}
                       <div className="space-y-4">
                         <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Style Options</h3>
-
-                        {/* Hair subcategory tabs */}
-                        {activeCategory === 'hair' && (
-                          <div className="flex gap-2 flex-wrap">
-                            {(Object.entries(HAIR_GROUPS) as [HairGroup, typeof HAIR_GROUPS[HairGroup]][]).map(([key, group]) => (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                          {BUILDER_OPTIONS[activeCategory].options.map((opt) => {
+                            const config = BUILDER_OPTIONS[activeCategory];
+                            const isSelected = builderState[activeCategory] === opt;
+                            
+                            return (
                               <button
-                                key={key}
-                                onClick={() => setActiveHairGroup(key)}
-                                className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                  activeHairGroup === key
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                                    : 'bg-zinc-900/50 text-zinc-500 border border-zinc-800 hover:border-zinc-700 hover:text-zinc-400'
+                                key={opt}
+                                onClick={() => setBuilderState(prev => ({ ...prev, [activeCategory]: opt }))}
+                                className={`aspect-square rounded-[24px] border-2 flex flex-col items-center justify-center gap-2 transition-all group relative ${
+                                  isSelected
+                                    ? 'bg-emerald-500/10 border-emerald-500'
+                                    : 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700'
                                 }`}
                               >
-                                {group.label}
-                                <span className="ml-1.5 text-[9px] opacity-60">{group.styles.length}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                          {(() => {
-                            const config = BUILDER_OPTIONS[activeCategory];
-                            const rawOptions = activeCategory === 'hair'
-                              ? HAIR_GROUPS[activeHairGroup].styles
-                              : config.options;
-
-                            // Apply gender filter
-                            const genderFilters = (config as any).genderFilter as Record<string, string[]> | undefined;
-                            const filteredOptions = genderFilters
-                              ? rawOptions.filter(opt => {
-                                  const allowed = genderFilters[opt];
-                                  return !allowed || allowed.includes(builderState.gender);
-                                })
-                              : rawOptions;
-
-                            return filteredOptions.map((opt) => {
-                              const isSelected = builderState[activeCategory] === opt;
-
-                              return (
-                                <button
-                                  key={opt}
-                                  onClick={() => setBuilderState(prev => ({ ...prev, [activeCategory]: opt }))}
-                                  className={`aspect-square rounded-[24px] border-2 flex flex-col items-center justify-center gap-2 transition-all group relative ${
-                                    isSelected
-                                      ? 'bg-emerald-500/10 border-emerald-500'
-                                      : 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700'
-                                  }`}
-                                >
-                                  <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
-                                    {'thumbnails' in config ? (
-                                      <img
-                                        src={(config as any).thumbnails[opt]}
-                                        alt={opt}
-                                        className="w-full h-full object-cover rounded-xl"
-                                      />
-                                    ) : 'emojis' in config ? (
-                                      <span className="text-4xl">{(config as any).emojis[opt]}</span>
-                                    ) : (
-                                      <div
-                                        className="w-10 h-10 rounded-full border border-white/10"
-                                        style={{ backgroundColor: (config as any).colors?.[opt] || '#333' }}
-                                      />
-                                    )}
-                                  </div>
-                                  <span className={`text-[10px] font-bold px-2 text-center leading-tight ${isSelected ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                                    {opt}
-                                  </span>
-                                  {isSelected && (
-                                    <div className="absolute top-3 right-3">
-                                      <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                                        <Check className="w-3 h-3 text-black font-bold" />
-                                      </div>
-                                    </div>
+                                <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
+                                  {'thumbnails' in config ? (
+                                    <img 
+                                      src={(config as any).thumbnails[opt]} 
+                                      alt={opt}
+                                      className="w-full h-full object-contain p-1"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  ) : 'emojis' in config ? (
+                                    <span className="text-4xl">{(config as any).emojis[opt]}</span>
+                                  ) : (
+                                    <div 
+                                      className="w-10 h-10 rounded-full border border-white/10" 
+                                      style={{ backgroundColor: (config as any).colors?.[opt] || '#333' }} 
+                                    />
                                   )}
-                                </button>
-                              );
-                            });
-                          })()}
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 text-center leading-tight ${isSelected ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                                  {opt}
+                                </span>
+                                {isSelected && (
+                                  <div className="absolute top-3 right-3">
+                                    <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                                      <Check className="w-3 h-3 text-black font-bold" />
+                                    </div>
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -795,49 +670,21 @@ export default function App() {
               )}
             </div>
 
-            {/* Regenerate with style button */}
-            {currentAvatar && !isGenerating && (
-              <button
-                onClick={() => handleGenerate()}
-                className="w-full py-3 rounded-2xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-500/40 text-sm font-medium text-zinc-400 hover:text-emerald-400 transition-all flex items-center justify-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Regenerate as {selectedStyle.name}
-              </button>
-            )}
-
             {/* History */}
-            {savedAvatars.length > 0 && (
+            {history.length > 0 && (
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
-                  Recent Creations
-                  <span className="ml-2 text-xs text-zinc-600">({savedAvatars.length}/{MAX_SAVED})</span>
-                </h3>
+                <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Recent Creations</h3>
                 <div className="grid grid-cols-4 gap-3">
-                  {savedAvatars.map((avatar) => (
-                    <div
-                      key={avatar.id}
-                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-all relative group ${
-                        currentAvatar === avatar.imageUrl ? 'border-emerald-500 scale-95' : 'border-transparent hover:border-zinc-700'
+                  {history.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setCurrentAvatar(img)}
+                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                        currentAvatar === img ? 'border-emerald-500 scale-95' : 'border-transparent hover:border-zinc-700'
                       }`}
                     >
-                      <img src={avatar.imageUrl} alt="Saved avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5">
-                        <button
-                          onClick={() => loadAvatar(avatar)}
-                          className="px-2.5 py-1 bg-emerald-500 text-black text-[9px] font-bold uppercase rounded-lg hover:bg-emerald-400 transition-colors"
-                        >
-                          Load
-                        </button>
-                        <button
-                          onClick={() => deleteAvatar(avatar.id)}
-                          className="p-1 text-zinc-400 hover:text-red-400 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
+                      <img src={img} alt={`History ${i}`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </button>
                   ))}
                 </div>
               </div>
@@ -855,21 +702,6 @@ export default function App() {
           </div>
         </footer>
       </div>
-
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 40 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-emerald-500 text-black text-sm font-bold rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center gap-2"
-          >
-            <Check className="w-4 h-4" />
-            {toast}
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
