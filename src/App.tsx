@@ -62,13 +62,31 @@ const BUILDER_OPTIONS = {
     name: '헤어스타일',
     icon: Scissors,
     options: ['Bald', 'Buzz Cut', 'Short Wavy', 'Side Part', 'Top Knot', 'Long Straight', 'Curly Afro', 'Bob Cut', 'Ponytail', 'Braids'],
-    emojis: { 'Bald': '👨‍🦲', 'Buzz Cut': '💇‍♂️', 'Short Wavy': '💇', 'Side Part': '💇‍♂️', 'Top Knot': '👱‍♂️', 'Long Straight': '💇‍♀️', 'Curly Afro': '🧑‍🦱', 'Bob Cut': '💇', 'Ponytail': '👱‍♀️', 'Braids': '👧' }
+    thumbnails: {
+      'Bald': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468_200d_1f9b2/512.webp',
+      'Buzz Cut': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468/512.webp',
+      'Short Wavy': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468_200d_1f9b0/512.webp',
+      'Side Part': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d1_200d_1f9b0/512.webp',
+      'Top Knot': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f471_200d_2642_fe0f/512.webp',
+      'Long Straight': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f469_200d_1f9b0/512.webp',
+      'Curly Afro': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d1_200d_1f9b1/512.webp',
+      'Bob Cut': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f469/512.webp',
+      'Ponytail': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f471_200d_2640_fe0f/512.webp',
+      'Braids': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f467/512.webp'
+    }
   },
   eyebrows: {
     name: '눈썹',
     icon: Wind,
     options: ['Natural', 'Thin', 'Thick', 'Arched', 'Straight', 'Bushy'],
-    emojis: { 'Natural': '〰️', 'Thin': '➖', 'Thick': '━━', 'Arched': '⤴️', 'Straight': '⎯', 'Bushy': '〰️〰️' }
+    thumbnails: {
+      'Natural': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f928/512.webp',
+      'Thin': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.webp',
+      'Thick': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f611/512.webp',
+      'Arched': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d0/512.webp',
+      'Straight': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f614/512.webp',
+      'Bushy': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f644/512.webp'
+    }
   },
   eyes: {
     name: '눈',
@@ -80,43 +98,94 @@ const BUILDER_OPTIONS = {
     name: '얼굴',
     icon: UserIcon,
     options: ['Oval', 'Round', 'Square', 'Heart', 'Diamond', 'Long'],
-    emojis: { 'Oval': '🥚', 'Round': '🟡', 'Square': '⬛', 'Heart': '🤍', 'Diamond': '💠', 'Long': '▯' }
+    thumbnails: {
+      'Oval': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f636/512.webp',
+      'Round': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f642/512.webp',
+      'Square': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f610/512.webp',
+      'Heart': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f970/512.webp',
+      'Diamond': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f607/512.webp',
+      'Long': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f62e/512.webp'
+    }
   },
   nose: {
     name: '코',
     icon: Cloud,
     options: ['Small', 'Pointy', 'Wide', 'Button', 'Hooked', 'Flat'],
-    emojis: { 'Small': '👃', 'Pointy': '👃', 'Wide': '👃', 'Button': '👃', 'Hooked': '👃', 'Flat': '👃' }
+    thumbnails: {
+      'Small': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Pointy': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Wide': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Button': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Hooked': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp',
+      'Flat': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f443/512.webp'
+    }
   },
   lips: {
     name: '입',
     icon: Smile,
     options: ['Natural', 'Thin', 'Full', 'Wide', 'Small', 'Pouty'],
-    emojis: { 'Natural': '👄', 'Thin': '👄', 'Full': '👄', 'Wide': '👄', 'Small': '👄', 'Pouty': '👄' }
+    thumbnails: {
+      'Natural': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Thin': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Full': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Wide': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Small': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp',
+      'Pouty': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f444/512.webp'
+    }
   },
   facialHair: {
     name: '수염',
     icon: MoreHorizontal,
     options: ['None', 'Stubble', 'Goatee', 'Full Beard', 'Mustache', 'Circle Beard'],
-    emojis: { 'None': '❌', 'Stubble': '🧔', 'Goatee': '🧔', 'Full Beard': '🧔', 'Mustache': '👨‍🦰', 'Circle Beard': '🧔' }
+    thumbnails: {
+      'None': 'https://fonts.gstatic.com/s/e/notoemoji/latest/274c/512.webp',
+      'Stubble': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp',
+      'Goatee': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp',
+      'Full Beard': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp',
+      'Mustache': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f468_200d_1f9b3/512.webp',
+      'Circle Beard': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9d4/512.webp'
+    }
   },
   glasses: {
     name: '안경',
     icon: Glasses,
     options: ['None', 'Rectangular', 'Round', 'Aviator', 'Cat Eye', 'Wayfarer'],
-    emojis: { 'None': '❌', 'Rectangular': '👓', 'Round': '👓', 'Aviator': '🕶️', 'Cat Eye': '👓', 'Wayfarer': '🕶️' }
+    thumbnails: {
+      'None': 'https://fonts.gstatic.com/s/e/notoemoji/latest/274c/512.webp',
+      'Rectangular': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f453/512.webp',
+      'Round': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f453/512.webp',
+      'Aviator': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f576/512.webp',
+      'Cat Eye': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f453/512.webp',
+      'Wayfarer': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f576/512.webp'
+    }
   },
   headwear: {
     name: '헤드웨어',
     icon: Circle,
     options: ['None', 'Beanie', 'Baseball Cap', 'Beret', 'Fedora', 'Headband', 'Turban'],
-    emojis: { 'None': '❌', 'Beanie': '🧶', 'Baseball Cap': '🧢', 'Beret': '🎨', 'Fedora': '🎩', 'Headband': '🎀', 'Turban': '👳' }
+    thumbnails: {
+      'None': 'https://fonts.gstatic.com/s/e/notoemoji/latest/274c/512.webp',
+      'Beanie': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e2/512.webp',
+      'Baseball Cap': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e2/512.webp',
+      'Beret': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3a8/512.webp',
+      'Fedora': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f3a9/512.webp',
+      'Headband': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f380/512.webp',
+      'Turban': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f473/512.webp'
+    }
   },
   outfit: {
     name: '옷',
     icon: Shirt,
     options: ['T-Shirt', 'Hoodie', 'Suit', 'Dress', 'Sweater', 'Jacket', 'Tank Top'],
-    emojis: { 'T-Shirt': '👕', 'Hoodie': '🧥', 'Suit': '💼', 'Dress': '👗', 'Sweater': '🧶', 'Jacket': '🧥', 'Tank Top': '🎽' }
+    thumbnails: {
+      'T-Shirt': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f455/512.webp',
+      'Hoodie': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e5/512.webp',
+      'Suit': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f4bc/512.webp',
+      'Dress': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f457/512.webp',
+      'Sweater': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e5/512.webp',
+      'Jacket': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1f9e5/512.webp',
+      'Tank Top': 'https://fonts.gstatic.com/s/e/notoemoji/latest/1fbd/512.webp'
+    }
   },
 };
 
@@ -423,9 +492,16 @@ export default function App() {
                                     : 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700'
                                 }`}
                               >
-                                <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center text-4xl shadow-inner group-hover:scale-110 transition-transform">
-                                  {'emojis' in config ? (
-                                    <span>{(config as any).emojis[opt]}</span>
+                                <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
+                                  {'thumbnails' in config ? (
+                                    <img 
+                                      src={(config as any).thumbnails[opt]} 
+                                      alt={opt}
+                                      className="w-full h-full object-contain p-1"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  ) : 'emojis' in config ? (
+                                    <span className="text-4xl">{(config as any).emojis[opt]}</span>
                                   ) : (
                                     <div 
                                       className="w-10 h-10 rounded-full border border-white/10" 
