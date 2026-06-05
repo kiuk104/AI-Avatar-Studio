@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Smile, UserCircle, Sparkles, Download, Loader2, AlertTriangle, RefreshCw, Play, FlaskConical, FileJson, Save,
+  Smile, UserCircle, Sparkles, Download, Loader2, AlertTriangle, RefreshCw, Play, FlaskConical, FileJson, Save, Layers,
 } from 'lucide-react';
+import { exportEmotionSheetPsd } from '../utils/psdExport';
 import type { SavedAvatar, EmotionSheetMeta } from '../utils/avatarDB';
 import { loadEmotionSheet } from '../utils/avatarDB';
 import type { GeminiUsage } from '../services/geminiService';
@@ -49,6 +50,7 @@ export default function EmotionSheetTab({
   const [error, setError] = useState<string | null>(null);
   const [regenningIndex, setRegenningIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [psdBusy, setPsdBusy] = useState(false);
   const cancelRef = useRef(false);
 
   const base = savedAvatars.find(a => a.id === emotionBaseId) ?? null;
@@ -225,6 +227,23 @@ export default function EmotionSheetTab({
       setSaving(false);
     }
   }, [base, sheetUrl, set, cols, rows, cell, expressions, member, onPersistSheet, showToast]);
+
+  // Export a layered PSD (cell=layer, name=expression id, + boundary guides) for hand-editing.
+  const exportPsd = useCallback(async () => {
+    if (!sheetUrl) return;
+    setPsdBusy(true);
+    setError(null);
+    try {
+      await exportEmotionSheetPsd({
+        sheetUrl, order: expressions.map(e => e.id), cols, rows, cell, filename: `${member}.psd`,
+      });
+    } catch (err) {
+      console.error('[emotion] PSD export failed:', err);
+      setError(`PSD 내보내기 실패: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setPsdBusy(false);
+    }
+  }, [sheetUrl, expressions, cols, rows, cell, member]);
 
   // ── No base avatars yet ──
   if (savedAvatars.length === 0) {
@@ -464,6 +483,15 @@ export default function EmotionSheetTab({
                 <FileJson className="w-4 h-4" /> manifest.json
               </button>
             </div>
+            <button
+              onClick={exportPsd}
+              disabled={psdBusy}
+              title="칸별 레이어 + 경계 가이드. Photoshop에서 손편집 후 PNG로 교체."
+              className="w-full py-3 rounded-2xl border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-400 font-bold text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            >
+              {psdBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+              레이어드 PSD ({member}.psd)
+            </button>
             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 space-y-2">
               <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">famillie-kim 연동</p>
               <p className="text-[11px] text-zinc-500 leading-relaxed">

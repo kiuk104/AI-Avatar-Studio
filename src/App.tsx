@@ -30,13 +30,15 @@ import {
   MoreHorizontal,
   Circle,
   Check,
-  Lock
+  Lock,
+  Layers
 } from 'lucide-react';
 import { generateAvatar, editAvatar } from './services/geminiService';
 import { HAIR_GROUPS, ALL_HAIR_STYLES, HAIR_THUMBNAIL_URL } from './components/thumbnails';
 import type { HairGroup } from './components/thumbnails';
 import { ColorSwatch } from './components/ColorSwatch';
 import EmotionSheetTab from './components/EmotionSheetTab';
+import { exportAvatarPsd } from './utils/psdExport';
 import { loadAvatars, saveAvatar as dbSaveAvatar, deleteAvatar as dbDeleteAvatar, migrateFromLocalStorage, saveEmotionSheet } from './utils/avatarDB';
 import type { SavedAvatar, BuilderSettings } from './utils/avatarDB';
 import { logApiCall, getTodayUsage, getMonthUsage, getAllUsage, sumUsage, formatTokens, DAILY_WARN, MONTHLY_WARN } from './utils/apiTracker';
@@ -1026,6 +1028,25 @@ export default function App() {
               >
                 <RefreshCw className="w-4 h-4" />
                 {isEditBase ? `Re-render as ${selectedStyle.name}` : `Regenerate as ${selectedStyle.name}`}
+              </button>
+            )}
+
+            {/* Export current avatar as a single-layer PSD for hand-editing */}
+            {currentAvatar && !isGenerating && (
+              <button
+                onClick={async () => {
+                  try {
+                    await exportAvatarPsd(currentAvatar, `avatar-${Date.now()}.psd`);
+                  } catch (err) {
+                    console.error('[avatar] PSD export failed:', err);
+                    setError('PSD 내보내기에 실패했습니다.');
+                  }
+                }}
+                title="단일 레이어, 투명 배경. Photoshop 보정용."
+                className="w-full py-3 rounded-2xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-500/40 text-sm font-medium text-zinc-400 hover:text-emerald-400 transition-all flex items-center justify-center gap-2"
+              >
+                <Layers className="w-4 h-4" />
+                PSD로 내보내기
               </button>
             )}
 

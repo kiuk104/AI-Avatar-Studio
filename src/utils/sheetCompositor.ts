@@ -3,7 +3,7 @@
  * (배치 스크립트의 sharp composite 대체. 배치식 동일: left=(i%cols)*cell, top=floor(i/cols)*cell)
  */
 
-function loadImage(url: string): Promise<HTMLImageElement> {
+export function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
