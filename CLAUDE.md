@@ -28,7 +28,8 @@ React 19, TypeScript ~5.8, Vite 6, Tailwind CSS 4, Motion(애니메이션), `@go
 
 ## 진행 상태 / 다음 단계
 
-- ✅ **설계 v2 1~6 전부 구현 완료** (일관성 델타 편집, 2탭 IA, 감정 시트 UI, 셀 크기 옵션, 액세서리 환각 방지 + 칸별 재생성, IndexedDB 영속화 v4). 설계: [docs/DESIGN_아바타스튜디오_v2.md](docs/DESIGN_아바타스튜디오_v2.md), 인수인계 이력: [docs/HANDOFF_클로드코드.md](docs/HANDOFF_클로드코드.md).
+- ✅ **설계 v2 1~7 완료** (일관성 델타 편집, 2탭 IA, 감정 시트 UI+셀 크기+칸별 재생성, IndexedDB 영속화 v4, PSD 내보내기). 설계: [docs/DESIGN_아바타스튜디오_v2.md](docs/DESIGN_아바타스튜디오_v2.md).
+- ✅ **커스터마이저 v3 1~5 완료** (삼성 AR 이모지식 빌더: 외모/스타일 2탭 + 카테고리 아이콘바, 신규 19속성, `PANELS` 일반화 패널, SVG 셀렉터 썸네일 `FaceThumbnail`). 설계: [docs/DESIGN_커스터마이저_v3.md](docs/DESIGN_커스터마이저_v3.md). 인수인계 이력: [docs/HANDOFF_클로드코드.md](docs/HANDOFF_클로드코드.md).
 - ▶ **다음(소비처 연동)**: 스튜디오에서 내보낸 시트를 `famillie-kim`에 실제 연결 — `src/assets/avatars/{member}.png` 복사 + `avatarSheets.js` SHEETS 등록, 데모용 `POC_FORCE_SHEET` 해제. 규약: `E:\Coding\famillie-kim\docs\HANDOFF_아바타_감정연동.md`.
 
 ## 제약 / 주의

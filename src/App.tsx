@@ -8,7 +8,7 @@ import {
   Palette, 
   Image as ImageIcon,
   Loader2,
-  ChevronRight,
+  Ban,
   History,
   Upload,
   X,
@@ -23,6 +23,7 @@ import {
   Smile,
   Cloud,
   Wind,
+  Ear,
   User as UserIcon,
   AlertTriangle,
   Type,
@@ -34,7 +35,7 @@ import {
   Layers
 } from 'lucide-react';
 import { generateAvatar, editAvatar } from './services/geminiService';
-import { HAIR_GROUPS, ALL_HAIR_STYLES, HAIR_THUMBNAIL_URL } from './components/thumbnails';
+import { HAIR_GROUPS, ALL_HAIR_STYLES, HAIR_THUMBNAIL_URL, FaceThumbnail, hasFaceThumb } from './components/thumbnails';
 import type { HairGroup } from './components/thumbnails';
 import { ColorSwatch } from './components/ColorSwatch';
 import EmotionSheetTab from './components/EmotionSheetTab';
@@ -47,8 +48,10 @@ import type { DailyUsage } from './utils/apiTracker';
 const STYLES = [
   { id: '3d-render', name: '3D Render', description: 'Modern Pixar-style 3D character', prompt: 'Pixar/Disney style 3D rendered character, high quality 3D render, smooth surfaces, soft studio lighting, subsurface scattering on skin' },
   { id: 'memoji', name: 'Memoji', description: 'Apple-style 3D avatar aesthetic', prompt: 'Apple Memoji style, soft 3D cartoon, pastel colors, friendly rounded features, clean 3D render, simple solid background' },
+  { id: 'emoji', name: 'Emoji', description: '메신저 이모지 느낌의 플랫 스타일 (famillie-kim)', prompt: 'flat 2D emoji style, simple bold rounded shapes, smooth solid bright colors, minimal shading, clean thick edges, friendly expressive face like a modern messaging-app emoji or sticker, centered, plain solid background' },
   { id: 'minimalist', name: 'Minimalist', description: 'Clean, flat vector illustration', prompt: 'flat vector illustration, clean lines, minimal details, simple geometric shapes, limited flat color palette, no gradients, graphic design style' },
   { id: 'pixel-art', name: 'Pixel Art', description: 'Retro 8-bit aesthetic', prompt: 'retro 8-bit pixel art style, clearly pixelated, limited color palette, no anti-aliasing, blocky pixels visible, retro game aesthetic' },
+  { id: 'pixel-memoji', name: 'Pixel Memoji', description: '둥근 캐릭터 픽셀 아바타 (감정차트 시트용)', prompt: 'cute pixel-art avatar portrait, chunky visible pixels but soft rounded memoji-like face, warm limited color palette, gentle soft shading, friendly expressive character, clean solid background, NOT a harsh retro game sprite' },
   { id: 'cyberpunk', name: 'Cyberpunk', description: 'Neon-lit futuristic look', prompt: 'cyberpunk style, neon-lit, dark moody background with neon glow effects, futuristic sci-fi aesthetic, holographic accents, dramatic lighting' },
   { id: 'sketch', name: 'Hand Drawn', description: 'Artistic charcoal or pencil sketch', prompt: 'pencil sketch style, hand-drawn charcoal illustration, artistic hatching and cross-hatching, paper texture, monochrome grayscale, traditional art look' },
   { id: 'anime', name: 'Anime', description: 'Classic Japanese animation style', prompt: 'Japanese anime style, large expressive eyes, cel-shaded coloring, manga aesthetic, clean lineart, vibrant saturated colors, anime character design' },
@@ -67,6 +70,46 @@ const OUTFIT_COLORS: Record<string, string> = {
   'Gray': '#616161', 'Beige': '#D7CCC8', 'Green': '#2E7D32', 'Blue': '#1565C0',
   'Pink': '#E91E63', 'Brown': '#5D4037',
 };
+
+// v3 color swatches (color-type attributes). Empty string = sentinel rendered as a ⊘ chip:
+// 'None' (blush/eyeshadow) or 'Match Hair' (inherits hair color — brow/facial-hair color).
+const EYE_COLORS: Record<string, string> = {
+  'Dark Brown': '#3B2314', 'Brown': '#6B4226', 'Hazel': '#8B6B3A', 'Amber': '#C57B2C',
+  'Green': '#4A7C3A', 'Blue': '#3A6EA5', 'Gray': '#7B8794',
+};
+const LIP_COLORS: Record<string, string> = {
+  'Natural': '#C68B7B', 'Nude': '#D8A48F', 'Pink': '#E68FA3', 'Coral': '#F08060',
+  'Red': '#C8324B', 'Berry': '#8E3B5C', 'Brown': '#8B5A3C',
+};
+const BLUSH_COLORS: Record<string, string> = {
+  'None': '', 'Rosy': '#E8889A', 'Peach': '#F0A878', 'Coral': '#F08060', 'Mauve': '#C08CA8',
+};
+const EYESHADOW_COLORS: Record<string, string> = {
+  'None': '', 'Neutral': '#C9A98C', 'Smoky': '#6B6B6B', 'Warm': '#B5703C', 'Cool': '#7B8FB0',
+};
+const BROW_COLORS: Record<string, string> = {
+  'Match Hair': '', 'Black': '#1A1A1A', 'Brown': '#6B4226', 'Blonde': '#D4A84B', 'Gray': '#9E9E9E',
+};
+const FACIAL_HAIR_COLORS: Record<string, string> = {
+  'Match Hair': '', 'Black': '#1A1A1A', 'Brown': '#6B4226', 'Gray': '#9E9E9E',
+};
+
+// v3 shape-type option lists (no thumbnails yet → text-chip fallback; SVG thumbnails in step 5).
+const SHAPE_OPTS = {
+  freckles: ['None', 'Light', 'Medium', 'Heavy'],
+  skinFinish: ['Natural', 'Matte', 'Dewy'],
+  forehead: ['Low', 'Average', 'High'],
+  chin: ['Round', 'Pointed', 'Square', 'Cleft'],
+  cheekbones: ['Low', 'Average', 'High'],
+  wrinkles: ['None', 'Light', 'Defined'],
+  eyeSize: ['Small', 'Medium', 'Large'],
+  eyelid: ['Monolid', 'Single', 'Double'],
+  eyelashes: ['Natural', 'Long', 'Dramatic'],
+  noseBridge: ['Low', 'Average', 'High'],
+  earShape: ['Small', 'Average', 'Large', 'Pointed', 'Round'],
+  earPosition: ['High', 'Average', 'Low'],
+  facePaint: ['None', 'Cheek Hearts', 'Star', 'Sport Stripes', 'Festival'],
+} as const;
 
 const BUILDER_OPTIONS = {
   gender: {
@@ -159,6 +202,103 @@ const BUILDER_OPTIONS = {
     thumbnails: Object.fromEntries(['T-Shirt', 'Hoodie', 'Suit', 'Dress', 'Sweater', 'Jacket', 'Tank Top', 'Turtleneck', 'Polo Shirt'].map(s => [s, thumbUrl('outfit', s)])),
     genderFilter: { 'Dress': ['Female', 'Non-binary'] } as Record<string, string[]>,
   },
+  // v3 new categories — meta only (name + icon); their attribute controls live in PANELS below.
+  ears: {
+    name: '귀',
+    icon: Ear,
+  },
+  makeup: {
+    name: '화장',
+    icon: Palette,
+  },
+};
+
+// One attribute control inside a category panel. A category may hold several (subsections).
+type Attr =
+  | {
+      kind: 'grid';
+      field: keyof BuilderSettings;
+      title: string;
+      options: readonly string[];
+      thumbnails?: Record<string, string>;
+      genderFilter?: Record<string, string[]>;
+      hairGroups?: true; // special: render HAIR_GROUPS tabs and group styles
+    }
+  | {
+      kind: 'swatch';
+      field: keyof BuilderSettings;
+      title: string;
+      groups: { label?: string; colors: Record<string, string> }[];
+      size?: 'sm' | 'md';
+    };
+
+// Drives the builder panel: each category → ordered attribute controls. Existing categories are
+// here too (single-attribute), so the panel renders through one code path. field/category keys are
+// type-checked, so a typo or a field missing from BuilderSettings fails tsc.
+const PANELS: Record<keyof typeof BUILDER_OPTIONS, Attr[]> = {
+  skin: [
+    { kind: 'swatch', field: 'skin', title: 'Skin Tone', groups: [{ colors: (BUILDER_OPTIONS.skin as any).colors }] },
+    { kind: 'grid', field: 'freckles', title: 'Freckles', options: SHAPE_OPTS.freckles },
+    { kind: 'grid', field: 'skinFinish', title: 'Skin Finish', options: SHAPE_OPTS.skinFinish },
+  ],
+  face: [
+    { kind: 'grid', field: 'face', title: 'Face Shape', options: BUILDER_OPTIONS.face.options, thumbnails: (BUILDER_OPTIONS.face as any).thumbnails },
+    { kind: 'grid', field: 'forehead', title: 'Forehead', options: SHAPE_OPTS.forehead },
+    { kind: 'grid', field: 'chin', title: 'Chin', options: SHAPE_OPTS.chin },
+    { kind: 'grid', field: 'cheekbones', title: 'Cheekbones', options: SHAPE_OPTS.cheekbones },
+    { kind: 'grid', field: 'wrinkles', title: 'Wrinkles', options: SHAPE_OPTS.wrinkles },
+  ],
+  eyebrows: [
+    { kind: 'grid', field: 'eyebrows', title: 'Eyebrow Style', options: BUILDER_OPTIONS.eyebrows.options, thumbnails: (BUILDER_OPTIONS.eyebrows as any).thumbnails },
+    { kind: 'swatch', field: 'browColor', title: 'Eyebrow Color', groups: [{ colors: BROW_COLORS }] },
+  ],
+  eyes: [
+    { kind: 'grid', field: 'eyes', title: 'Eye Shape', options: BUILDER_OPTIONS.eyes.options },
+    { kind: 'grid', field: 'eyeSize', title: 'Eye Size', options: SHAPE_OPTS.eyeSize },
+    { kind: 'grid', field: 'eyelid', title: 'Eyelid', options: SHAPE_OPTS.eyelid },
+    { kind: 'swatch', field: 'eyeColor', title: 'Eye Color', groups: [{ colors: EYE_COLORS }] },
+    { kind: 'grid', field: 'eyelashes', title: 'Eyelashes', options: SHAPE_OPTS.eyelashes },
+  ],
+  nose: [
+    { kind: 'grid', field: 'nose', title: 'Nose Shape', options: BUILDER_OPTIONS.nose.options, thumbnails: (BUILDER_OPTIONS.nose as any).thumbnails },
+    { kind: 'grid', field: 'noseBridge', title: 'Nose Bridge', options: SHAPE_OPTS.noseBridge },
+  ],
+  lips: [
+    { kind: 'grid', field: 'lips', title: 'Lip Style', options: BUILDER_OPTIONS.lips.options, thumbnails: (BUILDER_OPTIONS.lips as any).thumbnails },
+    { kind: 'swatch', field: 'lipColor', title: 'Lip Color', groups: [{ colors: LIP_COLORS }] },
+  ],
+  ears: [
+    { kind: 'grid', field: 'earShape', title: 'Ear Shape', options: SHAPE_OPTS.earShape },
+    { kind: 'grid', field: 'earPosition', title: 'Ear Position', options: SHAPE_OPTS.earPosition },
+  ],
+  hair: [
+    { kind: 'grid', field: 'hair', title: 'Hairstyle', options: ALL_HAIR_STYLES, thumbnails: (BUILDER_OPTIONS.hair as any).thumbnails, hairGroups: true },
+    {
+      kind: 'swatch', field: 'hairColor', title: 'Hair Color', size: 'sm',
+      groups: [
+        { label: HAIR_COLORS.natural.label, colors: HAIR_COLORS.natural.colors },
+        { label: HAIR_COLORS.special.label, colors: HAIR_COLORS.special.colors },
+      ],
+    },
+  ],
+  facialHair: [
+    { kind: 'grid', field: 'facialHair', title: 'Facial Hair', options: BUILDER_OPTIONS.facialHair.options, thumbnails: (BUILDER_OPTIONS.facialHair as any).thumbnails, genderFilter: (BUILDER_OPTIONS.facialHair as any).genderFilter },
+    { kind: 'swatch', field: 'facialHairColor', title: 'Facial Hair Color', groups: [{ colors: FACIAL_HAIR_COLORS }] },
+  ],
+  makeup: [
+    { kind: 'swatch', field: 'blush', title: 'Blush', groups: [{ colors: BLUSH_COLORS }] },
+    { kind: 'swatch', field: 'eyeshadow', title: 'Eyeshadow', groups: [{ colors: EYESHADOW_COLORS }] },
+    { kind: 'grid', field: 'facePaint', title: 'Face Paint', options: SHAPE_OPTS.facePaint },
+  ],
+  glasses: [{ kind: 'grid', field: 'glasses', title: 'Glasses', options: BUILDER_OPTIONS.glasses.options, thumbnails: (BUILDER_OPTIONS.glasses as any).thumbnails }],
+  earrings: [{ kind: 'grid', field: 'earrings', title: 'Earrings', options: BUILDER_OPTIONS.earrings.options, thumbnails: (BUILDER_OPTIONS.earrings as any).thumbnails }],
+  necklace: [{ kind: 'grid', field: 'necklace', title: 'Necklace', options: BUILDER_OPTIONS.necklace.options, thumbnails: (BUILDER_OPTIONS.necklace as any).thumbnails }],
+  headwear: [{ kind: 'grid', field: 'headwear', title: 'Headwear', options: BUILDER_OPTIONS.headwear.options, thumbnails: (BUILDER_OPTIONS.headwear as any).thumbnails }],
+  outfit: [
+    { kind: 'grid', field: 'outfit', title: 'Outfit', options: BUILDER_OPTIONS.outfit.options, thumbnails: (BUILDER_OPTIONS.outfit as any).thumbnails, genderFilter: (BUILDER_OPTIONS.outfit as any).genderFilter },
+    { kind: 'swatch', field: 'outfitColor', title: 'Outfit Color', size: 'sm', groups: [{ colors: OUTFIT_COLORS }] },
+  ],
+  gender: [{ kind: 'grid', field: 'gender', title: 'Gender', options: BUILDER_OPTIONS.gender.options, thumbnails: (BUILDER_OPTIONS.gender as any).thumbnails }],
 };
 
 const MAX_SAVED = 50;
@@ -169,6 +309,16 @@ const LABEL: Record<keyof BuilderSettings, string> = {
   hair: 'hairstyle', hairColor: 'hair color', eyebrows: 'eyebrow style', eyes: 'eye shape',
   face: 'face shape', nose: 'nose shape', lips: 'lip style', facialHair: 'facial hair',
   outfit: 'outfit', outfitColor: 'outfit color', skin: 'skin tone', gender: 'gender',
+  // 신규 v3
+  freckles: 'freckles', skinFinish: 'skin finish',
+  forehead: 'forehead', chin: 'chin', cheekbones: 'cheekbones', wrinkles: 'wrinkles',
+  browColor: 'eyebrow color',
+  eyeSize: 'eye size', eyelid: 'eyelid type', eyeColor: 'eye color', eyelashes: 'eyelashes',
+  noseBridge: 'nose bridge',
+  lipColor: 'lip color',
+  earShape: 'ear shape', earPosition: 'ear position',
+  facialHairColor: 'facial hair color',
+  blush: 'blush', eyeshadow: 'eyeshadow', facePaint: 'face paint',
 };
 
 // Build an edit instruction containing ONLY the changed attributes. Re-listing everything
@@ -179,6 +329,56 @@ function describeDelta(prev: BuilderSettings, next: BuilderSettings): string {
     .map(k => `${LABEL[k]} to "${next[k]}"`);
   return changes.length ? `Change the ${changes.join(', ')}.` : '';
 }
+
+// Default attribute snapshot. Module-scoped so it's a stable reference usable inside callbacks
+// (loadAvatar merges old saved records against it) without re-creating each render.
+const defaultBuilderState: BuilderSettings = {
+  gender: 'Male',
+  skin: 'Medium',
+  hair: 'Short Wavy',
+  hairColor: 'Black',
+  eyebrows: 'Natural',
+  eyes: 'Round',
+  face: 'Oval',
+  nose: 'Small',
+  lips: 'Natural',
+  facialHair: 'None',
+  glasses: 'None',
+  earrings: 'None',
+  necklace: 'None',
+  headwear: 'None',
+  outfit: 'T-Shirt',
+  outfitColor: 'Black',
+  // 신규 v3 — '없음/보통/Match Hair' 계열(프롬프트 비대화 방지 헬퍼의 생략 기준과 일치)
+  freckles: 'None',
+  skinFinish: 'Natural',
+  forehead: 'Average',
+  chin: 'Round',
+  cheekbones: 'Average',
+  wrinkles: 'None',
+  browColor: 'Match Hair',
+  eyeSize: 'Medium',
+  eyelid: 'Double',
+  eyeColor: 'Dark Brown',
+  eyelashes: 'Natural',
+  noseBridge: 'Average',
+  lipColor: 'Natural',
+  earShape: 'Average',
+  earPosition: 'Average',
+  facialHairColor: 'Match Hair',
+  blush: 'None',
+  eyeshadow: 'None',
+  facePaint: 'None',
+};
+
+// Builder navigation: two top-level segments, each owning a subset of BUILDER_OPTIONS categories.
+// New v3 categories (ears/makeup) slot into `cats` here in step 3. Keys are checked against
+// keyof BUILDER_OPTIONS so a typo/missing category fails tsc.
+const SEGMENTS = {
+  appearance: { label: '외모', cats: ['skin', 'face', 'eyebrows', 'eyes', 'nose', 'lips', 'ears', 'hair', 'facialHair', 'makeup'] },
+  style: { label: '스타일', cats: ['glasses', 'earrings', 'necklace', 'headwear', 'outfit', 'gender'] },
+} as const satisfies Record<string, { label: string; cats: readonly (keyof typeof BUILDER_OPTIONS)[] }>;
+type SegmentKey = keyof typeof SEGMENTS;
 
 export default function App() {
   // Top-level feature tabs: A = 아바타 만들기(create/edit), B = 감정 시트.
@@ -208,28 +408,17 @@ export default function App() {
   const [usageMonth, setUsageMonth] = useState<DailyUsage[]>([]);
   const [usageAll, setUsageAll] = useState<DailyUsage[]>([]);
 
-  // Builder State
-  const defaultBuilderState: BuilderSettings = {
-    gender: 'Male',
-    skin: 'Medium',
-    hair: 'Short Wavy',
-    hairColor: 'Black',
-    eyebrows: 'Natural',
-    eyes: 'Round',
-    face: 'Oval',
-    nose: 'Small',
-    lips: 'Natural',
-    facialHair: 'None',
-    glasses: 'None',
-    earrings: 'None',
-    necklace: 'None',
-    headwear: 'None',
-    outfit: 'T-Shirt',
-    outfitColor: 'Black',
-  };
+  // Builder State (defaultBuilderState is module-scoped above)
   const [builderState, setBuilderState] = useState<BuilderSettings>(defaultBuilderState);
-  const [activeCategory, setActiveCategory] = useState<keyof typeof BUILDER_OPTIONS>('gender');
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>('appearance');
+  const [activeCategory, setActiveCategory] = useState<keyof typeof BUILDER_OPTIONS>('skin');
   const [activeHairGroup, setActiveHairGroup] = useState<HairGroup>('short');
+
+  // Switching segment moves focus to its first category (the current one may not belong to it).
+  const selectSegment = useCallback((seg: SegmentKey) => {
+    setActiveSegment(seg);
+    setActiveCategory(SEGMENTS[seg].cats[0]);
+  }, []);
 
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -276,6 +465,105 @@ export default function App() {
   const isEditBase = mode === 'builder' && !!currentAvatar && !!baseSnapshot;
   const hasPendingEdit = isEditBase &&
     (describeDelta(baseSnapshot!, builderState) !== '' || selectedStyle.id !== baseStyleId);
+
+  // Render one attribute control (subsection) of the active category's panel. `showHeader` is on
+  // when the category has more than one attribute (design §5). Closes over builder state/setters.
+  const renderAttr = (attr: Attr, showHeader: boolean) => {
+    const header = showHeader ? (
+      <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{attr.title}</h3>
+    ) : null;
+
+    if (attr.kind === 'swatch') {
+      return (
+        <div key={attr.field} className="space-y-3">
+          {header}
+          {attr.groups.map((g, i) => (
+            <ColorSwatch
+              key={g.label ?? i}
+              colors={g.colors}
+              selected={builderState[attr.field] ?? ''}
+              onSelect={(name) => setBuilderState(prev => ({ ...prev, [attr.field]: name }))}
+              label={g.label}
+              size={attr.size ?? 'md'}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    const rawOptions = attr.hairGroups ? HAIR_GROUPS[activeHairGroup].styles : attr.options;
+    const options = attr.genderFilter
+      ? rawOptions.filter(opt => {
+          const allowed = attr.genderFilter![opt];
+          return !allowed || allowed.includes(builderState.gender);
+        })
+      : rawOptions;
+
+    return (
+      <div key={attr.field} className="space-y-4">
+        {header}
+        {attr.hairGroups && (
+          <div className="flex gap-2 flex-wrap">
+            {(Object.entries(HAIR_GROUPS) as [HairGroup, typeof HAIR_GROUPS[HairGroup]][]).map(([key, group]) => (
+              <button
+                key={key}
+                onClick={() => setActiveHairGroup(key)}
+                className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${
+                  activeHairGroup === key
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                    : 'bg-zinc-900/50 text-zinc-500 border border-zinc-800 hover:border-zinc-700 hover:text-zinc-400'
+                }`}
+              >
+                {group.label}
+                <span className="ml-1.5 text-[9px] opacity-60">{group.styles.length}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {options.map((opt) => {
+            const isSelected = builderState[attr.field] === opt;
+            const thumb = attr.thumbnails?.[opt];
+            const faceThumb = opt !== 'None' && hasFaceThumb(attr.field, opt); // SVG takes priority over PNG
+            const hasVisual = opt === 'None' || faceThumb || !!thumb; // text-chip cells carry the name in the box, no duplicate label
+            return (
+              <button
+                key={opt}
+                onClick={() => setBuilderState(prev => ({ ...prev, [attr.field]: opt }))}
+                className={`aspect-square rounded-[24px] border-2 flex flex-col items-center justify-center gap-2 transition-all group relative ${
+                  isSelected ? 'bg-emerald-500/10 border-emerald-500' : 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700'
+                }`}
+              >
+                <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
+                  {opt === 'None' ? (
+                    <Ban className={`w-7 h-7 ${isSelected ? 'text-emerald-400' : 'text-zinc-600'}`} />
+                  ) : faceThumb ? (
+                    <FaceThumbnail field={attr.field} option={opt} size={64} />
+                  ) : thumb ? (
+                    <img src={thumb} alt={opt} className="w-full h-full object-cover rounded-xl" />
+                  ) : (
+                    <span className={`text-xs font-bold text-center leading-tight px-1 ${isSelected ? 'text-emerald-300' : 'text-zinc-300'}`}>{opt}</span>
+                  )}
+                </div>
+                {hasVisual && (
+                  <span className={`text-[10px] font-bold px-2 text-center leading-tight ${isSelected ? 'text-emerald-400' : 'text-zinc-500'}`}>
+                    {opt}
+                  </span>
+                )}
+                {isSelected && (
+                  <div className="absolute top-3 right-3">
+                    <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                      <Check className="w-3 h-3 text-black font-bold" />
+                    </div>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   const handleGenerate = useCallback(async (forceNew = false) => {
     const isEdit = mode === 'builder' && !!currentAvatar && !!baseSnapshot && !forceNew;
@@ -366,7 +654,7 @@ export default function App() {
 
     if (mode === 'builder') {
       // Build a structured spec so Gemini treats each attribute as a strict constraint
-      const spec = [
+      const base = [
         `[CHARACTER SPEC — follow every attribute exactly]`,
         `Gender: ${builderState.gender}`,
         `Skin tone: ${builderState.skin}`,
@@ -383,9 +671,38 @@ export default function App() {
         `Necklace: ${builderState.necklace}`,
         `Headwear: ${builderState.headwear}`,
         `Outfit: ${builderState.outfitColor} ${builderState.outfit}`,
-      ].join('\n');
+      ];
 
-      finalPrompt = `Generate an avatar in the following art style: "${selectedStyle.name}".\nEXACTLY match the character specification below. Do NOT deviate from any attribute — each one is intentionally chosen by the user.\n\n${spec}\n\nIMPORTANT: Render the character exactly as specified above. Do not change, add, or omit any feature. The art style MUST be "${selectedStyle.name}" — not 3D render unless that style is specifically selected. Front-facing view, centered, clean solid background.`;
+      // v3 refinements (color / makeup / fine shape). Only emit non-default values so the spec
+      // stays lean — defaults match defaultBuilderState (§7, §10 prompt-bloat guard).
+      const b = builderState;
+      const extra: string[] = [];
+      const addAttr = (label: string, value: string | undefined, def: string, text?: (v: string) => string) => {
+        if (value && value !== def) extra.push(`${label}: ${text ? text(value) : value}`);
+      };
+      addAttr('Freckles', b.freckles, 'None', v => `${v.toLowerCase()} freckles`);
+      addAttr('Skin finish', b.skinFinish, 'Natural');
+      addAttr('Forehead', b.forehead, 'Average', v => `${v.toLowerCase()} forehead`);
+      addAttr('Chin', b.chin, 'Round', v => `${v.toLowerCase()} chin`);
+      addAttr('Cheekbones', b.cheekbones, 'Average', v => v === 'High' ? 'high and prominent' : 'low and flat');
+      addAttr('Wrinkles', b.wrinkles, 'None', v => `${v.toLowerCase()} wrinkles`);
+      addAttr('Eyebrow color', b.browColor, 'Match Hair');
+      addAttr('Eye size', b.eyeSize, 'Medium', v => `${v.toLowerCase()} eyes`);
+      addAttr('Eyelid', b.eyelid, 'Double', v => v === 'Monolid' ? 'monolid (no crease)' : 'single eyelid');
+      addAttr('Eye color', b.eyeColor, 'Dark Brown');
+      addAttr('Eyelashes', b.eyelashes, 'Natural', v => v === 'Dramatic' ? 'dramatic voluminous lashes' : 'long lashes');
+      addAttr('Nose bridge', b.noseBridge, 'Average', v => `${v.toLowerCase()} nose bridge`);
+      addAttr('Lip color', b.lipColor, 'Natural');
+      addAttr('Ear shape', b.earShape, 'Average', v => `${v.toLowerCase()} ears`);
+      addAttr('Ear position', b.earPosition, 'Average', v => v === 'High' ? 'high-set' : 'low-set');
+      if (b.facialHair !== 'None') addAttr('Facial hair color', b.facialHairColor, 'Match Hair'); // moot without facial hair
+      addAttr('Blush', b.blush, 'None', v => `${v.toLowerCase()} blush`);
+      addAttr('Eyeshadow', b.eyeshadow, 'None', v => `${v.toLowerCase()} eyeshadow`);
+      addAttr('Face paint', b.facePaint, 'None');
+
+      const spec = [...base, ...extra].join('\n');
+
+      finalPrompt = `Generate an avatar in "${selectedStyle.name}" art style: ${selectedStyle.prompt}.\nEXACTLY match the character specification below. Do NOT deviate from any attribute — each one is intentionally chosen by the user.\n\n${spec}\n\nIMPORTANT: Render the character exactly as specified above. Do not change, add, or omit any feature. The ENTIRE image must be rendered in "${selectedStyle.name}" style as described above. Front-facing view, centered, clean solid background.`;
       // stylePrompt already set to selectedStyle.prompt above — do not override
     } else {
       // For text mode, default to front view if no camera-related keywords are present
@@ -406,7 +723,11 @@ export default function App() {
     // "couldn't generate". Persistence/logging run afterwards and must not discard a good image.
     let result: Awaited<ReturnType<typeof generateAvatar>>;
     try {
-      result = await generateAvatar(finalPrompt, stylePrompt, referenceImage || undefined);
+      // Reference image is a TEXT-mode feature. In builder mode it must NOT be sent — a leftover
+      // upload would make Gemini copy the reference's style and ignore the selected art style
+      // (symptom: every style renders the same). Only pass it for text-mode generations.
+      const refForGen = mode === 'text' ? (referenceImage || undefined) : undefined;
+      result = await generateAvatar(finalPrompt, stylePrompt, refForGen);
     } catch (err) {
       setError(`Failed to generate avatar: ${err instanceof Error ? err.message : String(err)}`);
       console.error('[generate] Gemini call failed:', err);
@@ -484,7 +805,11 @@ export default function App() {
 
   const loadAvatar = useCallback((avatar: SavedAvatar) => {
     setCurrentAvatar(avatar.imageUrl);
-    setBuilderState(avatar.settings);
+    // Merge against defaults so legacy records (saved before v3 fields existed) get every field
+    // filled. Otherwise builderState (defaults applied on edit) would differ from baseSnapshot
+    // (raw record) and produce a spurious delta the moment the user opens the avatar.
+    const merged = { ...defaultBuilderState, ...avatar.settings };
+    setBuilderState(merged);
     setCurrentAvatarId(avatar.id);
     const style = STYLES.find(s => s.id === avatar.styleId);
     if (style) setSelectedStyle(style);
@@ -499,12 +824,13 @@ export default function App() {
       setOriginalBaseStyleId(null);
     } else {
       setMode('builder');
-      // Builder-origin save becomes the editable base — "수정 적용" keeps identity.
-      setBaseSnapshot(avatar.settings);
+      // Builder-origin save becomes the editable base — "수정 적용" keeps identity. Base snapshot
+      // must use the same merged settings as builderState so the initial delta is empty.
+      setBaseSnapshot(merged);
       setBaseStyleId(avatar.styleId);
       // Prefer the persisted original base; fall back to current for legacy records.
       setOriginalBaseUrl(avatar.originalBaseUrl ?? avatar.imageUrl);
-      setOriginalBaseSnapshot(avatar.originalBaseSnapshot ?? avatar.settings);
+      setOriginalBaseSnapshot({ ...defaultBuilderState, ...(avatar.originalBaseSnapshot ?? avatar.settings) });
       setOriginalBaseStyleId(avatar.originalBaseStyleId ?? avatar.styleId);
     }
     showToast('Avatar loaded — tweak and apply edits');
@@ -695,30 +1021,42 @@ export default function App() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
-                  className="bg-zinc-900/50 border border-zinc-800 rounded-[32px] overflow-hidden flex flex-col md:flex-row h-[600px]"
+                  className="bg-zinc-900/50 border border-zinc-800 rounded-[32px] overflow-hidden flex flex-col h-[600px]"
                 >
-                  {/* Sidebar Categories */}
-                  <div className="w-full md:w-64 bg-zinc-900/80 border-r border-zinc-800 flex flex-col">
-                    <div className="p-6 border-b border-zinc-800">
-                      <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Categories</h3>
+                  {/* Top: 외모/스타일 2-segment toggle + horizontal category icon bar */}
+                  <div className="bg-zinc-900/80 border-b border-zinc-800">
+                    <div className="flex gap-1 px-3 pt-3">
+                      {(Object.entries(SEGMENTS) as [SegmentKey, typeof SEGMENTS[SegmentKey]][]).map(([key, seg]) => (
+                        <button
+                          key={key}
+                          onClick={() => selectSegment(key)}
+                          className={`px-4 py-2 rounded-t-xl text-sm font-bold transition-all ${
+                            activeSegment === key
+                              ? 'bg-black/20 text-white'
+                              : 'text-zinc-500 hover:text-zinc-300'
+                          }`}
+                        >
+                          {seg.label}
+                        </button>
+                      ))}
                     </div>
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1 scrollbar-hide">
-                      {Object.entries(BUILDER_OPTIONS).map(([category, config]) => {
+                    <div className="flex gap-1 overflow-x-auto scrollbar-hide p-3">
+                      {SEGMENTS[activeSegment].cats.map((category) => {
+                        const config = BUILDER_OPTIONS[category];
                         const Icon = config.icon;
                         const isActive = activeCategory === category;
                         return (
                           <button
                             key={category}
-                            onClick={() => setActiveCategory(category as keyof typeof BUILDER_OPTIONS)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${
-                              isActive 
-                                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' 
+                            onClick={() => setActiveCategory(category)}
+                            className={`shrink-0 flex flex-col items-center gap-1.5 px-4 py-2.5 rounded-xl transition-all group ${
+                              isActive
+                                ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20'
                                 : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
                             }`}
                           >
                             <Icon className={`w-5 h-5 ${isActive ? 'text-black' : 'text-zinc-500 group-hover:text-emerald-400'}`} />
-                            <span className="text-sm font-medium">{(config as any).name}</span>
-                            {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+                            <span className="text-[11px] font-medium whitespace-nowrap">{(config as any).name}</span>
                           </button>
                         );
                       })}
@@ -726,7 +1064,7 @@ export default function App() {
                   </div>
 
                   {/* Main Options Area */}
-                  <div className="flex-1 flex flex-col bg-black/20">
+                  <div className="flex-1 flex flex-col bg-black/20 min-h-0">
                     <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
                       <h2 className="text-lg font-bold">{(BUILDER_OPTIONS[activeCategory] as any).name}</h2>
                       {isEditBase && (
@@ -738,137 +1076,11 @@ export default function App() {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800">
-                      {/* Color Palette (if applicable) */}
-                      {'colors' in BUILDER_OPTIONS[activeCategory] && (
-                        <div className="space-y-4">
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Color Palette</h3>
-                          <ColorSwatch
-                            colors={(BUILDER_OPTIONS[activeCategory] as any).colors}
-                            selected={builderState[activeCategory]}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, [activeCategory]: name }))}
-                          />
-                        </div>
-                      )}
-
-                      {/* Hair color swatches */}
-                      {activeCategory === 'hair' && (
-                        <div className="space-y-3">
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Hair Color</h3>
-                          <ColorSwatch
-                            colors={HAIR_COLORS.natural.colors}
-                            selected={builderState.hairColor}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, hairColor: name }))}
-                            label={HAIR_COLORS.natural.label}
-                            size="sm"
-                          />
-                          <ColorSwatch
-                            colors={HAIR_COLORS.special.colors}
-                            selected={builderState.hairColor}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, hairColor: name }))}
-                            label={HAIR_COLORS.special.label}
-                            size="sm"
-                          />
-                        </div>
-                      )}
-
-                      {/* Outfit color swatches */}
-                      {activeCategory === 'outfit' && (
-                        <div className="space-y-3">
-                          <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Outfit Color</h3>
-                          <ColorSwatch
-                            colors={OUTFIT_COLORS}
-                            selected={builderState.outfitColor}
-                            onSelect={(name) => setBuilderState(prev => ({ ...prev, outfitColor: name }))}
-                            size="sm"
-                          />
-                        </div>
-                      )}
-
-                      {/* Visual Options Grid */}
-                      <div className="space-y-4">
-                        <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Style Options</h3>
-
-                        {/* Hair subcategory tabs */}
-                        {activeCategory === 'hair' && (
-                          <div className="flex gap-2 flex-wrap">
-                            {(Object.entries(HAIR_GROUPS) as [HairGroup, typeof HAIR_GROUPS[HairGroup]][]).map(([key, group]) => (
-                              <button
-                                key={key}
-                                onClick={() => setActiveHairGroup(key)}
-                                className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all ${
-                                  activeHairGroup === key
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                                    : 'bg-zinc-900/50 text-zinc-500 border border-zinc-800 hover:border-zinc-700 hover:text-zinc-400'
-                                }`}
-                              >
-                                {group.label}
-                                <span className="ml-1.5 text-[9px] opacity-60">{group.styles.length}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                          {(() => {
-                            const config = BUILDER_OPTIONS[activeCategory];
-                            const rawOptions = activeCategory === 'hair'
-                              ? HAIR_GROUPS[activeHairGroup].styles
-                              : config.options;
-
-                            // Apply gender filter
-                            const genderFilters = (config as any).genderFilter as Record<string, string[]> | undefined;
-                            const filteredOptions = genderFilters
-                              ? rawOptions.filter(opt => {
-                                  const allowed = genderFilters[opt];
-                                  return !allowed || allowed.includes(builderState.gender);
-                                })
-                              : rawOptions;
-
-                            return filteredOptions.map((opt) => {
-                              const isSelected = builderState[activeCategory] === opt;
-
-                              return (
-                                <button
-                                  key={opt}
-                                  onClick={() => setBuilderState(prev => ({ ...prev, [activeCategory]: opt }))}
-                                  className={`aspect-square rounded-[24px] border-2 flex flex-col items-center justify-center gap-2 transition-all group relative ${
-                                    isSelected
-                                      ? 'bg-emerald-500/10 border-emerald-500'
-                                      : 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700'
-                                  }`}
-                                >
-                                  <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
-                                    {'thumbnails' in config ? (
-                                      <img
-                                        src={(config as any).thumbnails[opt]}
-                                        alt={opt}
-                                        className="w-full h-full object-cover rounded-xl"
-                                      />
-                                    ) : 'emojis' in config ? (
-                                      <span className="text-4xl">{(config as any).emojis[opt]}</span>
-                                    ) : (
-                                      <div
-                                        className="w-10 h-10 rounded-full border border-white/10"
-                                        style={{ backgroundColor: (config as any).colors?.[opt] || '#333' }}
-                                      />
-                                    )}
-                                  </div>
-                                  <span className={`text-[10px] font-bold px-2 text-center leading-tight ${isSelected ? 'text-emerald-400' : 'text-zinc-500'}`}>
-                                    {opt}
-                                  </span>
-                                  {isSelected && (
-                                    <div className="absolute top-3 right-3">
-                                      <div className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                                        <Check className="w-3 h-3 text-black font-bold" />
-                                      </div>
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </div>
+                      {(() => {
+                        const attrs = PANELS[activeCategory];
+                        const showHeaders = attrs.length > 1; // §5: subsection headers only when multiple attributes
+                        return attrs.map(attr => renderAttr(attr, showHeaders));
+                      })()}
                     </div>
 
                     <div className="p-4 bg-zinc-900/80 border-t border-zinc-800 flex items-center gap-3">

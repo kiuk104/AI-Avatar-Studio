@@ -12,10 +12,21 @@ const MAX_AVATARS = 50;
 const LS_KEY = 'avatar-studio-saved';
 
 export type BuilderSettings = {
+  // 기존 16
   gender: string; skin: string; hair: string; hairColor: string;
   eyebrows: string; eyes: string; face: string; nose: string;
   lips: string; facialHair: string; glasses: string; earrings: string;
   necklace: string; headwear: string; outfit: string; outfitColor: string;
+  // 신규 v3 — 전부 옵셔널 + defaultBuilderState 기본값(하위호환, DB 버전 불변)
+  freckles?: string; skinFinish?: string;                                    // 피부
+  forehead?: string; chin?: string; cheekbones?: string; wrinkles?: string;  // 얼굴형
+  browColor?: string;                                                        // 눈썹
+  eyeSize?: string; eyelid?: string; eyeColor?: string; eyelashes?: string;  // 눈
+  noseBridge?: string;                                                       // 코
+  lipColor?: string;                                                         // 입
+  earShape?: string; earPosition?: string;                                   // 귀
+  facialHairColor?: string;                                                  // 수염
+  blush?: string; eyeshadow?: string; facePaint?: string;                    // 화장
 };
 
 /** Lightweight emotion-sheet metadata stored inline on the avatar (NO image data). */
