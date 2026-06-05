@@ -23,27 +23,33 @@ import {
   Smile,
   Cloud,
   Wind,
-  Zap as ZapIcon,
   User as UserIcon,
+  AlertTriangle,
   Type,
   Settings,
   MoreHorizontal,
   Circle,
-  Check
+  Check,
+  Lock
 } from 'lucide-react';
-import { generateAvatar } from './services/geminiService';
+import { generateAvatar, editAvatar } from './services/geminiService';
 import { HAIR_GROUPS, ALL_HAIR_STYLES, HAIR_THUMBNAIL_URL } from './components/thumbnails';
 import type { HairGroup } from './components/thumbnails';
 import { ColorSwatch } from './components/ColorSwatch';
+import EmotionSheetTab from './components/EmotionSheetTab';
+import { loadAvatars, saveAvatar as dbSaveAvatar, deleteAvatar as dbDeleteAvatar, migrateFromLocalStorage, saveEmotionSheet } from './utils/avatarDB';
+import type { SavedAvatar, BuilderSettings } from './utils/avatarDB';
+import { logApiCall, getTodayUsage, getMonthUsage, getAllUsage, sumUsage, formatTokens, DAILY_WARN, MONTHLY_WARN } from './utils/apiTracker';
+import type { DailyUsage } from './utils/apiTracker';
 
 const STYLES = [
-  { id: '3d-render', name: '3D Render', description: 'Modern Pixar-style 3D character', prompt: '3D Pixar style, high detail, soft lighting' },
-  { id: 'memoji', name: 'Memoji', description: 'Apple-style 3D avatar aesthetic', prompt: 'iPhone Memoji style, 3D emoji aesthetic, clean 3D render, Apple aesthetic' },
-  { id: 'minimalist', name: 'Minimalist', description: 'Clean, flat vector illustration', prompt: 'flat minimalist vector illustration, clean lines' },
-  { id: 'pixel-art', name: 'Pixel Art', description: 'Retro 8-bit aesthetic', prompt: 'retro pixel art, 16-bit aesthetic' },
-  { id: 'cyberpunk', name: 'Cyberpunk', description: 'Neon-lit futuristic look', prompt: 'cyberpunk aesthetic, neon lighting, futuristic' },
-  { id: 'sketch', name: 'Hand Drawn', description: 'Artistic charcoal or pencil sketch', prompt: 'artistic pencil sketch, hand-drawn texture' },
-  { id: 'anime', name: 'Anime', description: 'Classic Japanese animation style', prompt: 'modern anime style, vibrant colors' },
+  { id: '3d-render', name: '3D Render', description: 'Modern Pixar-style 3D character', prompt: 'Pixar/Disney style 3D rendered character, high quality 3D render, smooth surfaces, soft studio lighting, subsurface scattering on skin' },
+  { id: 'memoji', name: 'Memoji', description: 'Apple-style 3D avatar aesthetic', prompt: 'Apple Memoji style, soft 3D cartoon, pastel colors, friendly rounded features, clean 3D render, simple solid background' },
+  { id: 'minimalist', name: 'Minimalist', description: 'Clean, flat vector illustration', prompt: 'flat vector illustration, clean lines, minimal details, simple geometric shapes, limited flat color palette, no gradients, graphic design style' },
+  { id: 'pixel-art', name: 'Pixel Art', description: 'Retro 8-bit aesthetic', prompt: 'retro 8-bit pixel art style, clearly pixelated, limited color palette, no anti-aliasing, blocky pixels visible, retro game aesthetic' },
+  { id: 'cyberpunk', name: 'Cyberpunk', description: 'Neon-lit futuristic look', prompt: 'cyberpunk style, neon-lit, dark moody background with neon glow effects, futuristic sci-fi aesthetic, holographic accents, dramatic lighting' },
+  { id: 'sketch', name: 'Hand Drawn', description: 'Artistic charcoal or pencil sketch', prompt: 'pencil sketch style, hand-drawn charcoal illustration, artistic hatching and cross-hatching, paper texture, monochrome grayscale, traditional art look' },
+  { id: 'anime', name: 'Anime', description: 'Classic Japanese animation style', prompt: 'Japanese anime style, large expressive eyes, cel-shaded coloring, manga aesthetic, clean lineart, vibrant saturated colors, anime character design' },
 ];
 
 const thumbUrl = (cat: string, opt: string) =>
@@ -153,49 +159,52 @@ const BUILDER_OPTIONS = {
   },
 };
 
-// --- Saved Avatar Types ---
-type BuilderSettings = {
-  gender: string; skin: string; hair: string; hairColor: string;
-  eyebrows: string; eyes: string; face: string; nose: string;
-  lips: string; facialHair: string; glasses: string; earrings: string;
-  necklace: string; headwear: string; outfit: string; outfitColor: string;
+const MAX_SAVED = 50;
+
+// Human-readable labels for each builder attribute, used to phrase delta-edit instructions.
+const LABEL: Record<keyof BuilderSettings, string> = {
+  glasses: 'glasses', earrings: 'earrings', necklace: 'necklace', headwear: 'headwear',
+  hair: 'hairstyle', hairColor: 'hair color', eyebrows: 'eyebrow style', eyes: 'eye shape',
+  face: 'face shape', nose: 'nose shape', lips: 'lip style', facialHair: 'facial hair',
+  outfit: 'outfit', outfitColor: 'outfit color', skin: 'skin tone', gender: 'gender',
 };
 
-type SavedAvatar = {
-  id: string;
-  createdAt: number;
-  imageUrl: string;
-  settings: BuilderSettings;
-  styleId: string;
-  mode: 'text' | 'builder';
-  prompt?: string;
-};
-
-const STORAGE_KEY = 'avatar-studio-saved';
-const MAX_SAVED = 20;
-
-function loadSaved(): SavedAvatar[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function persistSaved(items: SavedAvatar[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_SAVED)));
+// Build an edit instruction containing ONLY the changed attributes. Re-listing everything
+// would make the model re-roll the whole character; the delta keeps identity intact.
+function describeDelta(prev: BuilderSettings, next: BuilderSettings): string {
+  const changes = (Object.keys(next) as (keyof BuilderSettings)[])
+    .filter(k => prev[k] !== next[k])
+    .map(k => `${LABEL[k]} to "${next[k]}"`);
+  return changes.length ? `Change the ${changes.join(', ')}.` : '';
 }
 
 export default function App() {
+  // Top-level feature tabs: A = 아바타 만들기(create/edit), B = 감정 시트.
+  const [activeTab, setActiveTab] = useState<'create' | 'emotion'>('create');
+  const [emotionBaseId, setEmotionBaseId] = useState<string | null>(null);
   const [mode, setMode] = useState<'text' | 'builder'>('text');
   const [prompt, setPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState(STYLES[0]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [currentAvatar, setCurrentAvatar] = useState<string | null>(null);
-  const [savedAvatars, setSavedAvatars] = useState<SavedAvatar[]>(loadSaved);
+  const [savedAvatars, setSavedAvatars] = useState<SavedAvatar[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [referenceImage, setReferenceImage] = useState<string | null>(null);
-  const [autoGenEnabled, setAutoGenEnabled] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Delta-edit base: identity the current image carries. Edit path is active when these are set.
+  const [baseSnapshot, setBaseSnapshot] = useState<BuilderSettings | null>(null);
+  const [baseStyleId, setBaseStyleId] = useState<string | null>(null);
+  const [currentAvatarId, setCurrentAvatarId] = useState<string | null>(null);
+  // First base, kept for "revert to original" (drift recovery). Persistence is a later step.
+  const [originalBaseUrl, setOriginalBaseUrl] = useState<string | null>(null);
+  const [originalBaseSnapshot, setOriginalBaseSnapshot] = useState<BuilderSettings | null>(null);
+  const [originalBaseStyleId, setOriginalBaseStyleId] = useState<string | null>(null);
+
+  const [showUsageModal, setShowUsageModal] = useState(false);
+  const [usageToday, setUsageToday] = useState<DailyUsage | null>(null);
+  const [usageMonth, setUsageMonth] = useState<DailyUsage[]>([]);
+  const [usageAll, setUsageAll] = useState<DailyUsage[]>([]);
 
   // Builder State
   const defaultBuilderState: BuilderSettings = {
@@ -220,7 +229,6 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<keyof typeof BUILDER_OPTIONS>('gender');
   const [activeHairGroup, setActiveHairGroup] = useState<HairGroup>('short');
 
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const toastTimer = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -229,8 +237,22 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), 2500);
   }, []);
 
-  // Derived: history images for backward compat
-  const history = savedAvatars.map(a => a.imageUrl);
+  const refreshUsageStats = useCallback(async () => {
+    const [today, month, all] = await Promise.all([getTodayUsage(), getMonthUsage(), getAllUsage()]);
+    setUsageToday(today);
+    setUsageMonth(month);
+    setUsageAll(all);
+  }, []);
+
+  // Load avatars + usage from IndexedDB on mount (with localStorage migration)
+  useEffect(() => {
+    (async () => {
+      await migrateFromLocalStorage();
+      const avatars = await loadAvatars();
+      setSavedAvatars(avatars);
+      await refreshUsageStats();
+    })();
+  }, [refreshUsageStats]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -247,110 +269,261 @@ export default function App() {
     }
   };
 
-  const handleGenerate = useCallback(async (isAuto = false) => {
+  // True when a builder base exists and there are pending changes to apply as a delta edit.
+  // Shared by the "수정 적용" button (disabled state) and handleGenerate's edit early-return.
+  const isEditBase = mode === 'builder' && !!currentAvatar && !!baseSnapshot;
+  const hasPendingEdit = isEditBase &&
+    (describeDelta(baseSnapshot!, builderState) !== '' || selectedStyle.id !== baseStyleId);
+
+  const handleGenerate = useCallback(async (forceNew = false) => {
+    const isEdit = mode === 'builder' && !!currentAvatar && !!baseSnapshot && !forceNew;
+
+    // ----- Edit path: feed current avatar back as reference, change only the delta -----
+    if (isEdit) {
+      const attrDelta = describeDelta(baseSnapshot!, builderState);
+      const styleChanged = selectedStyle.id !== baseStyleId;
+      if (!attrDelta && !styleChanged) return; // nothing changed — skip the call (save quota)
+
+      const instruction = [
+        attrDelta,
+        styleChanged ? `Re-render the SAME person in the "${selectedStyle.name}" art style.` : '',
+      ].filter(Boolean).join(' ');
+
+      setIsGenerating(true);
+      setError(null);
+
+      let result: Awaited<ReturnType<typeof editAvatar>>;
+      try {
+        result = await editAvatar(currentAvatar!, instruction, selectedStyle.name);
+      } catch (err) {
+        setError(`Failed to apply edit: ${err instanceof Error ? err.message : String(err)}`);
+        console.error('[edit] Gemini call failed:', err);
+        setIsGenerating(false);
+        return;
+      }
+
+      setCurrentAvatar(result.imageUrl);
+      setBaseSnapshot({ ...builderState });
+      setBaseStyleId(selectedStyle.id);
+      // originalBaseUrl / originalBaseSnapshot stay put — they anchor "revert to original".
+
+      // Bookkeeping: log usage + in-place library update. Non-fatal if it fails.
+      try {
+        if (result.usage) {
+          await logApiCall(result.usage);
+          await refreshUsageStats();
+        }
+
+        // In-place update of the same library record (avoid history spam).
+        if (currentAvatarId) {
+          const existing = savedAvatars.find(a => a.id === currentAvatarId);
+          const updated: SavedAvatar = {
+            ...(existing ?? {}),                 // preserve originalBase* + emotionSheet
+            id: currentAvatarId,
+            createdAt: existing?.createdAt ?? Date.now(),
+            imageUrl: result.imageUrl,
+            settings: { ...builderState },
+            styleId: selectedStyle.id,
+            mode: 'builder',
+            prompt: undefined,
+          };
+          await dbSaveAvatar(updated);
+          setSavedAvatars(prev => prev.map(a => (a.id === currentAvatarId ? updated : a)));
+        } else {
+          // No record to update (e.g. edited a base that was never saved) — create one,
+          // anchoring the original base to the pre-edit image/settings.
+          const created: SavedAvatar = {
+            id: crypto.randomUUID(),
+            createdAt: Date.now(),
+            imageUrl: result.imageUrl,
+            settings: { ...builderState },
+            styleId: selectedStyle.id,
+            mode: 'builder',
+            originalBaseUrl: originalBaseUrl ?? currentAvatar ?? result.imageUrl,
+            originalBaseSnapshot: originalBaseSnapshot ?? baseSnapshot ?? { ...builderState },
+            originalBaseStyleId: originalBaseStyleId ?? baseStyleId ?? selectedStyle.id,
+          };
+          await dbSaveAvatar(created);
+          setCurrentAvatarId(created.id);
+          setSavedAvatars(prev => [created, ...prev].slice(0, MAX_SAVED));
+        }
+        showToast('Edit applied!');
+      } catch (err) {
+        console.error('[edit] save/log failed:', err);
+        setError(`Edited, but saving failed: ${err instanceof Error ? err.message : String(err)}`);
+        showToast('Edited (not saved to library)');
+      } finally {
+        setIsGenerating(false);
+      }
+      return;
+    }
+
+    // ----- Create path: confirm a fresh identity from text/spec -----
     let finalPrompt = prompt;
     let stylePrompt = selectedStyle.prompt;
-    
+
     if (mode === 'builder') {
-      const parts: string[] = [
-        `A 3D Memoji ${builderState.gender.toLowerCase()} character`,
-        `with ${builderState.skin} skin`,
-        `${builderState.hairColor} colored ${builderState.hair} hair`,
-        `${builderState.eyebrows} eyebrows`,
-        `${builderState.eyes} eyes`,
-        `${builderState.face} face shape`,
-        `${builderState.nose} nose`,
-        `${builderState.lips} lips`,
-      ];
-      if (builderState.facialHair !== 'None') parts.push(`${builderState.facialHair} facial hair`);
-      if (builderState.glasses !== 'None') parts.push(`wearing ${builderState.glasses} glasses`);
-      if (builderState.earrings !== 'None') parts.push(`wearing ${builderState.earrings} earrings`);
-      if (builderState.necklace !== 'None') parts.push(`wearing a ${builderState.necklace} necklace`);
-      if (builderState.headwear !== 'None') parts.push(`wearing a ${builderState.headwear}`);
-      parts.push(`wearing a ${builderState.outfitColor} ${builderState.outfit}`);
-      parts.push('Front view, clean background.');
-      finalPrompt = parts.join(', ');
-      stylePrompt = 'iPhone Memoji style, 3D emoji aesthetic, clean 3D render, Apple aesthetic, high quality, studio lighting';
+      // Build a structured spec so Gemini treats each attribute as a strict constraint
+      const spec = [
+        `[CHARACTER SPEC — follow every attribute exactly]`,
+        `Gender: ${builderState.gender}`,
+        `Skin tone: ${builderState.skin}`,
+        `Hair style: ${builderState.hair}`,
+        `Hair color: ${builderState.hairColor}`,
+        `Eyebrow style: ${builderState.eyebrows}`,
+        `Eye shape: ${builderState.eyes}`,
+        `Face shape: ${builderState.face}`,
+        `Nose shape: ${builderState.nose}`,
+        `Lip style: ${builderState.lips}`,
+        `Facial hair: ${builderState.facialHair}`,
+        `Glasses: ${builderState.glasses}`,
+        `Earrings: ${builderState.earrings}`,
+        `Necklace: ${builderState.necklace}`,
+        `Headwear: ${builderState.headwear}`,
+        `Outfit: ${builderState.outfitColor} ${builderState.outfit}`,
+      ].join('\n');
+
+      finalPrompt = `Generate an avatar in the following art style: "${selectedStyle.name}".\nEXACTLY match the character specification below. Do NOT deviate from any attribute — each one is intentionally chosen by the user.\n\n${spec}\n\nIMPORTANT: Render the character exactly as specified above. Do not change, add, or omit any feature. The art style MUST be "${selectedStyle.name}" — not 3D render unless that style is specifically selected. Front-facing view, centered, clean solid background.`;
+      // stylePrompt already set to selectedStyle.prompt above — do not override
     } else {
       // For text mode, default to front view if no camera-related keywords are present
       const cameraKeywords = ['view', 'angle', 'shot', 'profile', 'facing', 'side', 'back', 'top', 'bottom'];
       const hasCameraSetting = cameraKeywords.some(keyword => finalPrompt.toLowerCase().includes(keyword));
-      
+
       if (!hasCameraSetting && finalPrompt.trim()) {
         finalPrompt = `${finalPrompt}, front view, facing camera`;
       }
     }
 
     if (!finalPrompt.trim() && mode === 'text') return;
-    
+
     setIsGenerating(true);
     setError(null);
-    try {
-      const imageUrl = await generateAvatar(finalPrompt, stylePrompt, referenceImage || undefined);
-      setCurrentAvatar(imageUrl);
 
-      const saved: SavedAvatar = {
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        imageUrl,
-        settings: { ...builderState },
-        styleId: selectedStyle.id,
-        mode,
-        prompt: mode === 'text' ? prompt : undefined,
-      };
-      setSavedAvatars(prev => {
-        const next = [saved, ...prev].slice(0, MAX_SAVED);
-        persistSaved(next);
-        return next;
-      });
-      if (!isAuto) showToast('Avatar saved!');
+    // Generation is the expensive, fail-prone step — its failure is the only one that means
+    // "couldn't generate". Persistence/logging run afterwards and must not discard a good image.
+    let result: Awaited<ReturnType<typeof generateAvatar>>;
+    try {
+      result = await generateAvatar(finalPrompt, stylePrompt, referenceImage || undefined);
     } catch (err) {
-      if (!isAuto) {
-        setError('Failed to generate avatar. Please try again.');
+      setError(`Failed to generate avatar: ${err instanceof Error ? err.message : String(err)}`);
+      console.error('[generate] Gemini call failed:', err);
+      setIsGenerating(false);
+      return;
+    }
+
+    setCurrentAvatar(result.imageUrl);
+    // Establish the editable base up front so a later save/log hiccup can't strand it
+    // (builder only — text saves carry a default snapshot, so no edit base).
+    if (mode === 'builder') {
+      const snap = { ...builderState };
+      setBaseSnapshot(snap);
+      setBaseStyleId(selectedStyle.id);
+      setOriginalBaseUrl(result.imageUrl);
+      setOriginalBaseSnapshot(snap);
+      setOriginalBaseStyleId(selectedStyle.id);
+    } else {
+      setBaseSnapshot(null);
+      setBaseStyleId(null);
+      setOriginalBaseUrl(null);
+      setOriginalBaseSnapshot(null);
+      setOriginalBaseStyleId(null);
+    }
+
+    const saved: SavedAvatar = {
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      imageUrl: result.imageUrl,
+      settings: { ...builderState },
+      styleId: selectedStyle.id,
+      mode,
+      prompt: mode === 'text' ? prompt : undefined,
+      // Builder avatars anchor their original base here (text saves have no edit base).
+      ...(mode === 'builder' ? {
+        originalBaseUrl: result.imageUrl,
+        originalBaseSnapshot: { ...builderState },
+        originalBaseStyleId: selectedStyle.id,
+      } : {}),
+    };
+
+    // Bookkeeping: log usage + persist. Failures here are non-fatal — the avatar still stands.
+    try {
+      if (result.usage) {
+        await logApiCall(result.usage);
+        await refreshUsageStats();
       }
-      console.error(err);
+      await dbSaveAvatar(saved);
+      setSavedAvatars(prev => [saved, ...prev].slice(0, MAX_SAVED));
+      setCurrentAvatarId(saved.id);
+      showToast('Avatar saved!');
+    } catch (err) {
+      console.error('[generate] save/log failed:', err);
+      setError(`Generated, but saving failed: ${err instanceof Error ? err.message : String(err)}`);
+      showToast('Generated (not saved to library)');
     } finally {
       setIsGenerating(false);
     }
-  }, [mode, prompt, selectedStyle, builderState, referenceImage, showToast]);
+  }, [mode, prompt, selectedStyle, builderState, referenceImage, currentAvatar, baseSnapshot, baseStyleId, currentAvatarId, savedAvatars, originalBaseUrl, originalBaseSnapshot, originalBaseStyleId, showToast, refreshUsageStats]);
+
+  const revertToOriginal = useCallback(() => {
+    if (!originalBaseUrl || !originalBaseSnapshot) return;
+    setCurrentAvatar(originalBaseUrl);
+    setBuilderState(originalBaseSnapshot);
+    setBaseSnapshot(originalBaseSnapshot);
+    // Restore the style too, so the selector matches the reverted image and no spurious
+    // style delta is pending right after reverting (selectedStyle === baseStyleId).
+    if (originalBaseStyleId) {
+      const s = STYLES.find(x => x.id === originalBaseStyleId);
+      if (s) setSelectedStyle(s);
+      setBaseStyleId(originalBaseStyleId);
+    }
+    showToast('Reverted to original');
+  }, [originalBaseUrl, originalBaseSnapshot, originalBaseStyleId, showToast]);
 
   const loadAvatar = useCallback((avatar: SavedAvatar) => {
     setCurrentAvatar(avatar.imageUrl);
     setBuilderState(avatar.settings);
+    setCurrentAvatarId(avatar.id);
     const style = STYLES.find(s => s.id === avatar.styleId);
     if (style) setSelectedStyle(style);
     if (avatar.mode === 'text' && avatar.prompt) {
       setMode('text');
       setPrompt(avatar.prompt);
+      // Text-origin saves don't carry a meaningful builder snapshot — no edit base.
+      setBaseSnapshot(null);
+      setBaseStyleId(null);
+      setOriginalBaseUrl(null);
+      setOriginalBaseSnapshot(null);
+      setOriginalBaseStyleId(null);
     } else {
       setMode('builder');
+      // Builder-origin save becomes the editable base — "수정 적용" keeps identity.
+      setBaseSnapshot(avatar.settings);
+      setBaseStyleId(avatar.styleId);
+      // Prefer the persisted original base; fall back to current for legacy records.
+      setOriginalBaseUrl(avatar.originalBaseUrl ?? avatar.imageUrl);
+      setOriginalBaseSnapshot(avatar.originalBaseSnapshot ?? avatar.settings);
+      setOriginalBaseStyleId(avatar.originalBaseStyleId ?? avatar.styleId);
     }
-    showToast('Settings restored!');
+    showToast('Avatar loaded — tweak and apply edits');
   }, [showToast]);
 
-  const deleteAvatar = useCallback((id: string) => {
-    setSavedAvatars(prev => {
-      const next = prev.filter(a => a.id !== id);
-      persistSaved(next);
-      return next;
-    });
+  const deleteAvatar = useCallback(async (id: string) => {
+    await dbDeleteAvatar(id);
+    setSavedAvatars(prev => prev.filter(a => a.id !== id));
     showToast('Avatar deleted');
   }, [showToast]);
 
-  // Auto-generation effect for Builder Mode
-  useEffect(() => {
-    if (mode === 'builder' && autoGenEnabled) {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      
-      debounceTimer.current = setTimeout(() => {
-        handleGenerate(true);
-      }, 1000); // 1 second debounce
-    }
-    
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [builderState, mode, autoGenEnabled, handleGenerate]);
+  // Library card entry points — reuse existing logic, just route between tabs.
+  const goEditAvatar = useCallback((avatar: SavedAvatar) => {
+    loadAvatar(avatar);
+    setActiveTab('create');
+  }, [loadAvatar]);
+
+  const goEmotionSheet = useCallback((avatar: SavedAvatar) => {
+    setEmotionBaseId(avatar.id);
+    setActiveTab('emotion');
+  }, []);
 
   const downloadImage = (url: string) => {
     const link = document.createElement('a');
@@ -387,9 +560,52 @@ export default function App() {
               <History className="w-4 h-4" />
               <span>{savedAvatars.length} Created</span>
             </div>
+            <button
+              onClick={() => setShowUsageModal(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${
+                (() => {
+                  const monthCost = sumUsage(usageMonth).cost;
+                  const todayCost = usageToday?.estimatedCost ?? 0;
+                  if (monthCost >= MONTHLY_WARN) return 'border-red-500/50 text-red-400 hover:bg-red-500/10';
+                  if (todayCost >= DAILY_WARN) return 'border-orange-500/50 text-orange-400 hover:bg-orange-500/10';
+                  return 'border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50';
+                })()
+              }`}
+            >
+              {(() => {
+                const monthCost = sumUsage(usageMonth).cost;
+                const todayCost = usageToday?.estimatedCost ?? 0;
+                if (monthCost >= MONTHLY_WARN || todayCost >= DAILY_WARN) return <AlertTriangle className="w-3.5 h-3.5" />;
+                return <Zap className="w-3.5 h-3.5" />;
+              })()}
+              <span>{'\u20AC'}{(usageToday?.estimatedCost ?? 0).toFixed(3)}</span>
+            </button>
           </div>
         </header>
 
+        {/* Top-level feature tabs */}
+        <div className="flex p-1.5 bg-zinc-900/80 rounded-2xl border border-zinc-800 mb-12 max-w-xl">
+          <button
+            onClick={() => setActiveTab('create')}
+            className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'create' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <UserCircle className="w-5 h-5" />
+            아바타 만들기
+          </button>
+          <button
+            onClick={() => setActiveTab('emotion')}
+            className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'emotion' ? 'bg-emerald-500 text-black shadow-lg shadow-emerald-500/20' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <Smile className="w-5 h-5" />
+            감정 시트
+          </button>
+        </div>
+
+        {activeTab === 'create' && (
         <main className="grid lg:grid-cols-[1fr_400px] gap-12">
           {/* Left Column: Editor */}
           <section className="space-y-8">
@@ -511,10 +727,12 @@ export default function App() {
                   <div className="flex-1 flex flex-col bg-black/20">
                     <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
                       <h2 className="text-lg font-bold">{(BUILDER_OPTIONS[activeCategory] as any).name}</h2>
-                      <div className="flex items-center gap-2">
-                        <ZapIcon className={`w-4 h-4 text-emerald-400 ${isGenerating ? 'animate-pulse' : ''}`} />
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Live Sync</span>
-                      </div>
+                      {isEditBase && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                          <Lock className="w-3 h-3 text-emerald-400" />
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Identity Locked</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800">
@@ -651,25 +869,15 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div className="p-4 bg-zinc-900/80 border-t border-zinc-800 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                          <Sparkles className="w-4 h-4 text-emerald-400" />
-                        </div>
-                        <p className="text-[10px] text-zinc-400 max-w-[200px] leading-tight">
-                          Real-time generation active. Changes reflect instantly in the preview.
-                        </p>
+                    <div className="p-4 bg-zinc-900/80 border-t border-zinc-800 flex items-center gap-3">
+                      <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center shrink-0">
+                        <Sparkles className="w-4 h-4 text-emerald-400" />
                       </div>
-                      <button 
-                        onClick={() => setAutoGenEnabled(!autoGenEnabled)}
-                        className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
-                          autoGenEnabled 
-                            ? 'bg-emerald-500 text-black' 
-                            : 'bg-zinc-800 text-zinc-500'
-                        }`}
-                      >
-                        {autoGenEnabled ? 'Auto-Sync ON' : 'Auto-Sync OFF'}
-                      </button>
+                      <p className="text-[10px] text-zinc-400 leading-tight">
+                        {isEditBase
+                          ? 'Tweak attributes or style, then press "수정 적용" to apply changes while keeping the same person.'
+                          : 'Pick attributes, then press "새 아바타" to generate your base avatar.'}
+                      </p>
                     </div>
                   </div>
                 </motion.div>
@@ -699,36 +907,51 @@ export default function App() {
               </div>
             </div>
 
-            <button
-              onClick={() => handleGenerate()}
-              disabled={isGenerating || (mode === 'text' && !prompt.trim())}
-              className={`w-full py-5 font-bold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl ${
-                mode === 'builder' && autoGenEnabled 
-                  ? 'bg-zinc-800 text-zinc-400 cursor-default' 
-                  : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/10'
-              } disabled:bg-zinc-800 disabled:text-zinc-600`}
-            >
-              {isGenerating ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  {mode === 'builder' && autoGenEnabled ? 'Syncing...' : 'Generating Magic...'}
-                </>
-              ) : (
-                <>
-                  {mode === 'builder' && autoGenEnabled ? (
-                    <>
-                      <Zap className="w-6 h-6 text-emerald-500" />
-                      Real-time Sync Active
-                    </>
+            {isEditBase ? (
+              // Edit mode: apply delta (primary) + start a fresh identity (secondary).
+              <div className="flex gap-3">
+                <button
+                  onClick={() => handleGenerate(false)}
+                  disabled={isGenerating || !hasPendingEdit}
+                  className="flex-[2] py-5 font-bold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/10 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:shadow-none"
+                >
+                  {isGenerating ? (
+                    <><Loader2 className="w-6 h-6 animate-spin" /> 적용 중...</>
                   ) : (
-                    <>
-                      <Sparkles className="w-6 h-6" />
-                      Generate Avatar
-                    </>
+                    <><Check className="w-6 h-6" /> 수정 적용</>
                   )}
-                </>
-              )}
-            </button>
+                </button>
+                <button
+                  onClick={() => handleGenerate(true)}
+                  disabled={isGenerating}
+                  className="flex-1 py-5 font-bold rounded-2xl transition-all flex items-center justify-center gap-2 border border-zinc-700 text-zinc-300 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-50"
+                >
+                  <Sparkles className="w-5 h-5" /> 새 아바타
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => handleGenerate(true)}
+                disabled={isGenerating || (mode === 'text' && !prompt.trim())}
+                className="w-full py-5 font-bold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/10 disabled:bg-zinc-800 disabled:text-zinc-600"
+              >
+                {isGenerating ? (
+                  <><Loader2 className="w-6 h-6 animate-spin" /> Generating Magic...</>
+                ) : (
+                  <><Sparkles className="w-6 h-6" /> {mode === 'builder' ? '아바타 생성' : 'Generate Avatar'}</>
+                )}
+              </button>
+            )}
+
+            {isEditBase && originalBaseUrl && currentAvatar !== originalBaseUrl && (
+              <button
+                onClick={revertToOriginal}
+                disabled={isGenerating}
+                className="w-full py-2.5 rounded-2xl bg-zinc-900/50 border border-zinc-800 hover:border-zinc-600 text-xs font-medium text-zinc-400 hover:text-zinc-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> 원본으로 되돌리기
+              </button>
+            )}
 
             {error && (
               <p className="text-red-400 text-sm text-center bg-red-400/10 py-3 rounded-xl border border-red-400/20">
@@ -763,7 +986,7 @@ export default function App() {
                         <Download className="w-6 h-6" />
                       </button>
                       <button
-                        onClick={handleGenerate}
+                        onClick={() => handleGenerate(!isEditBase)}
                         className="p-4 bg-emerald-500 text-black rounded-full hover:scale-110 transition-transform"
                       >
                         <RefreshCw className="w-6 h-6" />
@@ -788,21 +1011,21 @@ export default function App() {
                   <div className="flex flex-col items-center gap-4">
                     <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
                     <p className="text-emerald-500 font-medium animate-pulse">
-                      {mode === 'builder' && autoGenEnabled ? 'Updating Avatar...' : 'Dreaming...'}
+                      {isEditBase ? 'Updating Avatar...' : 'Dreaming...'}
                     </p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Regenerate with style button */}
+            {/* Re-render in the selected style — edit path keeps identity when a base exists */}
             {currentAvatar && !isGenerating && (
               <button
-                onClick={() => handleGenerate()}
+                onClick={() => handleGenerate(!isEditBase)}
                 className="w-full py-3 rounded-2xl bg-zinc-900/50 border border-zinc-800 hover:border-emerald-500/40 text-sm font-medium text-zinc-400 hover:text-emerald-400 transition-all flex items-center justify-center gap-2"
               >
                 <RefreshCw className="w-4 h-4" />
-                Regenerate as {selectedStyle.name}
+                {isEditBase ? `Re-render as ${selectedStyle.name}` : `Regenerate as ${selectedStyle.name}`}
               </button>
             )}
 
@@ -821,14 +1044,25 @@ export default function App() {
                         currentAvatar === avatar.imageUrl ? 'border-emerald-500 scale-95' : 'border-transparent hover:border-zinc-700'
                       }`}
                     >
-                      <img src={avatar.imageUrl} alt="Saved avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      <img src={avatar.imageUrl} alt="Saved avatar" className="w-full h-full object-cover" />
+                      {avatar.emotionSheet && (
+                        <div className="absolute top-1 left-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center shadow" title="감정 시트 저장됨">
+                          <Smile className="w-3 h-3 text-black" />
+                        </div>
+                      )}
                       {/* Hover overlay */}
                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5">
                         <button
-                          onClick={() => loadAvatar(avatar)}
+                          onClick={() => goEditAvatar(avatar)}
                           className="px-2.5 py-1 bg-emerald-500 text-black text-[9px] font-bold uppercase rounded-lg hover:bg-emerald-400 transition-colors"
                         >
-                          Load
+                          편집
+                        </button>
+                        <button
+                          onClick={() => goEmotionSheet(avatar)}
+                          className="px-2.5 py-1 bg-zinc-700 text-white text-[9px] font-bold uppercase rounded-lg hover:bg-zinc-600 transition-colors flex items-center gap-1"
+                        >
+                          <Smile className="w-3 h-3" /> 감정
                         </button>
                         <button
                           onClick={() => deleteAvatar(avatar.id)}
@@ -844,6 +1078,32 @@ export default function App() {
             )}
           </section>
         </main>
+        )}
+
+        {activeTab === 'emotion' && (
+          <EmotionSheetTab
+            savedAvatars={savedAvatars}
+            emotionBaseId={emotionBaseId}
+            setEmotionBaseId={setEmotionBaseId}
+            onGoCreate={() => setActiveTab('create')}
+            styles={STYLES}
+            onLogUsage={async (usage) => {
+              if (usage) {
+                await logApiCall(usage);
+                await refreshUsageStats();
+              }
+            }}
+            onPersistSheet={async (avatarId, meta, dataUrl) => {
+              await saveEmotionSheet(avatarId, dataUrl);
+              const existing = savedAvatars.find(a => a.id === avatarId);
+              if (!existing) return;
+              const updated = { ...existing, emotionSheet: meta };
+              await dbSaveAvatar(updated);
+              setSavedAvatars(prev => prev.map(a => (a.id === avatarId ? updated : a)));
+            }}
+            showToast={showToast}
+          />
+        )}
 
         {/* Footer Info */}
         <footer className="mt-24 pt-8 border-t border-zinc-900 flex flex-col md:flex-row items-center justify-between gap-4 text-zinc-500 text-xs">
@@ -855,6 +1115,81 @@ export default function App() {
           </div>
         </footer>
       </div>
+
+      {/* Usage Modal */}
+      <AnimatePresence>
+        {showUsageModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowUsageModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-base font-bold flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-emerald-400" />
+                  API Usage
+                </h2>
+                <button onClick={() => setShowUsageModal(false)} className="text-zinc-500 hover:text-white transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {(() => {
+                const today = { calls: usageToday?.calls ?? 0, tokens: (usageToday?.inputTokens ?? 0) + (usageToday?.outputTokens ?? 0), cost: usageToday?.estimatedCost ?? 0 };
+                const month = sumUsage(usageMonth);
+                const monthTokens = month.inputTokens + month.outputTokens;
+                const all = sumUsage(usageAll);
+                const monthCostWarn = month.cost >= MONTHLY_WARN;
+                const todayCostWarn = today.cost >= DAILY_WARN;
+
+                return (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 mb-5">
+                      <div className={`rounded-xl p-4 ${todayCostWarn ? 'bg-orange-500/10 border border-orange-500/30' : 'bg-zinc-800/60'}`}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Today</p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between"><span className="text-zinc-400">Calls</span><span className="font-mono font-bold">{today.calls}</span></div>
+                          <div className="flex justify-between"><span className="text-zinc-400">Tokens</span><span className="font-mono font-bold">{formatTokens(today.tokens)}</span></div>
+                          <div className="flex justify-between"><span className="text-zinc-400">Cost</span><span className={`font-mono font-bold ${todayCostWarn ? 'text-orange-400' : ''}`}>{'\u20AC'}{today.cost.toFixed(4)}</span></div>
+                        </div>
+                      </div>
+                      <div className={`rounded-xl p-4 ${monthCostWarn ? 'bg-red-500/10 border border-red-500/30' : 'bg-zinc-800/60'}`}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">This Month</p>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between"><span className="text-zinc-400">Calls</span><span className="font-mono font-bold">{month.calls}</span></div>
+                          <div className="flex justify-between"><span className="text-zinc-400">Tokens</span><span className="font-mono font-bold">{formatTokens(monthTokens)}</span></div>
+                          <div className="flex justify-between"><span className="text-zinc-400">Cost</span><span className={`font-mono font-bold ${monthCostWarn ? 'text-red-400' : ''}`}>{'\u20AC'}{month.cost.toFixed(4)}</span></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-zinc-800 pt-4 flex items-center justify-between">
+                      <span className="text-sm text-zinc-400">Total Cost</span>
+                      <span className="text-lg font-mono font-bold">{'\u20AC'}{all.cost.toFixed(4)}</span>
+                    </div>
+
+                    {(todayCostWarn || monthCostWarn) && (
+                      <div className={`mt-4 flex items-start gap-2 text-xs rounded-lg p-3 ${monthCostWarn ? 'bg-red-500/10 text-red-400' : 'bg-orange-500/10 text-orange-400'}`}>
+                        <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                        <span>{monthCostWarn ? `Monthly cost exceeds \u20AC${MONTHLY_WARN.toFixed(2)} limit` : `Daily cost exceeds \u20AC${DAILY_WARN.toFixed(2)} limit`}</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Toast Notification */}
       <AnimatePresence>
